@@ -110,8 +110,6 @@ export function ItemSelectionModal({
             Add to Cart
           </button>
         </div>
-          </button>
-        </div>
       </div>
     </div>
   );

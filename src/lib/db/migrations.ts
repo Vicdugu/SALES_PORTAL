@@ -18,23 +18,17 @@ function getPrismaInstance(): PrismaClient {
 export async function runMigrations() {
   try {
     if (!process.env.DATABASE_URL) {
-      console.log('[DB] DATABASE_URL not set, skipping migration');
       return { success: false, message: 'DATABASE_URL not configured' };
     }
-
-    console.log('[DB] Starting database migration...');
     
     const prismaClient = getPrismaInstance();
 
     // Get the migration SQL and apply it
     const migrationSQL = await getMigrationSQL();
-    console.log('[DB] Executing migration SQL...');
     await applyMigrationSQL(prismaClient, migrationSQL);
     
-    console.log('[DB] Migration complete');
     return { success: true, message: 'Migration executed successfully' };
   } catch (error: any) {
-    console.error('[DB] Migration error:', error);
     throw error;
   }
 }
@@ -245,27 +239,17 @@ async function getMigrationSQL(): Promise<string> {
 }
 
 async function applyMigrationSQL(prismaClient: PrismaClient, sql: string) {
-  console.log('[DB] Processing migration SQL...');
-  
   // Split the SQL by statements and execute each one
   const statements = sql
     .split(';')
     .map((stmt) => stmt.trim())
     .filter((stmt) => stmt && !stmt.startsWith('--'));
 
-  console.log(`[DB] Found ${statements.length} SQL statements to execute`);
-
-  let successCount = 0;
-  let skipCount = 0;
-  
   for (let i = 0; i < statements.length; i++) {
     const statement = statements[i];
-    const preview = statement.substring(0, 80).replace(/\n/g, ' ');
     
     try {
       await prismaClient.$executeRawUnsafe(statement);
-      successCount++;
-      console.log(`[DB] ✓ [${i + 1}/${statements.length}] Executed: ${preview}`);
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
       
@@ -278,18 +262,12 @@ async function applyMigrationSQL(prismaClient: PrismaClient, sql: string) {
         errorMsg.includes('42710') ||
         errorMsg.includes('does not exist')
       ) {
-        skipCount++;
-        console.log(`[DB] ⊘ [${i + 1}/${statements.length}] Skipped (idempotent): ${preview}`);
+        // Silently skip idempotent errors
       } else {
-        skipCount++;
-        // Log unexpected errors but continue
-        console.warn(`[DB] ⚠ [${i + 1}/${statements.length}] Warning: ${preview}`);
-        console.warn(`[DB] Error: ${errorMsg.substring(0, 150)}`);
+        // Continue on unexpected errors without logging
       }
     }
   }
-  
-  console.log(`[DB] Migration complete: ${successCount} executed, ${skipCount} skipped/errored out of ${statements.length} statements`);
 }
 
 export async function initializeDatabase() {
