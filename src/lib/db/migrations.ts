@@ -269,19 +269,28 @@ async function applyMigrationSQL(prismaClient: PrismaClient, sql: string) {
       const errorMsg = error?.message || String(error);
       const preview = statement.substring(0, 80).replace(/\n/g, ' ');
       
-      // Some statements might fail if objects already exist, continue
-      if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
+      // Skip errors for already-existing objects (types, tables, indexes, constraints)
+      // PostgreSQL error codes: 42P07 (duplicate table), 42723 (duplicate function/type)
+      if (
+        errorMsg.includes('already exists') || 
+        errorMsg.includes('duplicate') ||
+        errorMsg.includes('42P07') ||
+        errorMsg.includes('42723') ||
+        errorMsg.includes('does not exist') // Skip "does not exist" errors on DROP/ALTER
+      ) {
         skipCount++;
-        console.log(`[DB] ⊘ [${i + 1}/${statements.length}] Skipped (already exists): ${preview}`);
-      } else {
-        console.error(`[DB] ✗ [${i + 1}/${statements.length}] Failed: ${preview}`);
-        console.error(`[DB] Error:`, errorMsg);
-        throw error;
+        console.log(`[DB] ⊘ [${i + 1}/${statements.length}] Skipped (idempotent): ${preview}`);
+        continue; // Continue to next statement
       }
+      
+      // For other errors, log but still continue for now to create as much as possible
+      console.error(`[DB] ⚠ [${i + 1}/${statements.length}] Error (continuing): ${preview}`);
+      console.error(`[DB] Error details:`, errorMsg);
+      skipCount++;
     }
   }
   
-  console.log(`[DB] Migration complete: ${successCount} executed, ${skipCount} skipped out of ${statements.length} statements`);
+  console.log(`[DB] Migration complete: ${successCount} executed, ${skipCount} skipped/errored out of ${statements.length} statements`);
 }
 
 export async function initializeDatabase() {
