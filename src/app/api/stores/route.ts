@@ -7,8 +7,6 @@ import { sendVerificationEmail } from '@/lib/email/client';
 import { getTokenFromHeader, verifyToken } from '@/lib/auth/jwt';
 import { runMigrations } from '@/lib/db/migrations';
 
-let migrationAttempted = false;
-
 /**
  * GET /api/stores - Get stores based on user role
  * - SUPERADMIN: Get all stores
@@ -17,14 +15,11 @@ let migrationAttempted = false;
 export async function GET(request: NextRequest) {
   try {
     // Initialize database on first request (if needed)
-    if (!migrationAttempted) {
-      migrationAttempted = true;
-      try {
-        await runMigrations();
-      } catch (migrationError) {
-        console.warn('Migration check failed:', migrationError);
-        // Continue anyway - schema might already exist
-      }
+    try {
+      await runMigrations();
+    } catch (migrationError) {
+      console.warn('[API] Migration check failed:', migrationError);
+      // Continue anyway - schema might already exist
     }
 
     // Extract and verify JWT token
@@ -139,14 +134,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Initialize database on first request (if needed)
-    if (!migrationAttempted) {
-      migrationAttempted = true;
-      try {
-        await runMigrations();
-      } catch (migrationError) {
-        console.warn('Migration check failed:', migrationError);
-        // Continue anyway - schema might already exist
-      }
+    try {
+      await runMigrations();
+    } catch (migrationError) {
+      console.warn('[API] Migration check failed:', migrationError);
+      // Continue anyway - schema might already exist
     }
 
     const body = await request.json();
