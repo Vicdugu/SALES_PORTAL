@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 
 interface TokenPayload {
   userId: string;
-  storeId: string;
+  storeId: string | null;
   email: string;
   role: string;
 }

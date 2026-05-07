@@ -16,7 +16,7 @@ interface InventoryItem {
 }
 
 interface ProductGridProps {
-  onAddItem: (item: InventoryItem, quantity: number) => void;
+  onAddItem: (item: InventoryItem, quantity: number, notes?: string) => void;
   refreshTrigger?: number;
 }
 

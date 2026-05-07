@@ -35,7 +35,11 @@ export async function GET(request: NextRequest) {
     const { role, storeId } = tokenPayload;
 
     // Build query based on user role
-    const whereClause = role === 'SUPERADMIN' ? {} : { id: storeId };
+    const whereClause = role === 'SUPERADMIN' 
+      ? {} 
+      : storeId 
+      ? { id: storeId }
+      : { id: 'invalid-no-store-id' }; // Return no results if storeId is null
 
     const stores = await prisma.store.findMany({
       where: whereClause,

@@ -143,7 +143,7 @@ export function OrderQueue({ onStatusUpdate }: OrderQueueProps) {
 
 interface OrderCardProps {
   order: Order;
-  onStatusUpdate: () => void;
+  onStatusUpdate: (orderId: string, status: string) => void;
 }
 
 function OrderCard({ order, onStatusUpdate }: OrderCardProps) {
@@ -159,7 +159,7 @@ function OrderCard({ order, onStatusUpdate }: OrderCardProps) {
       });
 
       if (response.ok) {
-        onStatusUpdate();
+        onStatusUpdate(order.id, newStatus);
       }
     } catch (err) {
       console.error('Error updating order status:', err);
