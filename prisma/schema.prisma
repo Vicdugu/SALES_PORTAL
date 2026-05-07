@@ -1,0 +1,237 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ===== TENANT MODEL =====
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  address   String?
+  phone     String?
+  
+  // Branding
+  logo           String?  // Store logo URL
+  backgroundImage String? // Store wallpaper/background URL
+  primaryColor   String   @default("#000000")
+  secondaryColor String   @default("#ffffff")
+  accentColor    String   @default("#0066cc")
+  
+  // Configuration
+  currency  String   @default("USD")
+  
+  // Status
+  isActive  Boolean  @default(true)
+  emailVerified Boolean @default(false)
+  verificationCode String?
+  verificationCodeExpiry DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  users     User[]
+  orders    Order[]
+  inventory InventoryItem[]
+  staff     StaffMember[]
+  notifications Notification[]
+  auditLogs AuditLog[]
+  
+  @@index([email])
+}
+
+// ===== USER MANAGEMENT =====
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(STAFF)
+  
+  storeId   String?
+  store     Store?   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  orders    Order[]
+  auditLogs AuditLog[]
+  
+  @@index([storeId])
+}
+
+enum Role {
+  STAFF      // Till operator
+  KITCHEN    // Kitchen staff
+  ADMIN      // Store admin
+  SUPERADMIN // System superadmin
+}
+
+model StaffMember {
+  id        String   @id @default(cuid())
+  userId    String
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  phone     String?
+  address   String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, storeId])
+  @@index([storeId])
+}
+
+// ===== ORDERS =====
+model Order {
+  id        String   @id @default(cuid())
+  orderNumber String  // Human-readable order number
+  
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  staffId   String?
+  staff     User?    @relation(fields: [staffId], references: [id])
+  
+  status    OrderStatus @default(PENDING)
+  
+  items     OrderItem[]
+  
+  subtotal  Float    @default(0)
+  tax       Float    @default(0)
+  total     Float    @default(0)
+  
+  paymentMethod String?
+  notes     String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+  
+  @@index([storeId])
+  @@index([staffId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  name      String
+  quantity  Int
+  unitPrice Float
+  notes     String?
+  
+  @@index([orderId])
+}
+
+// ===== INVENTORY =====
+model InventoryItem {
+  id        String   @id @default(cuid())
+  
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  name      String
+  category  String   // e.g., "Food", "Drink", "Dessert"
+  unitPrice Float    // Price for POS system
+  quantity  Int      // Available quantity for POS
+  unit      String   // e.g., "kg", "liters", "pieces"
+  currentStock Float
+  minimumStock Float @default(10)
+  
+  lastRestocked DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  usageHistory InventoryUsage[]
+  
+  @@unique([name, storeId])
+  @@index([storeId])
+  @@index([category])
+}
+
+model InventoryUsage {
+  id        String   @id @default(cuid())
+  
+  itemId    String
+  item      InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  
+  quantity  Float
+  reason    String   // "ORDER", "ADJUSTMENT", "DAMAGE"
+  
+  createdAt DateTime @default(now())
+  
+  @@index([itemId])
+}
+
+// ===== NOTIFICATIONS =====
+model Notification {
+  id        String   @id @default(cuid())
+  
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  type      NotificationType
+  title     String
+  message   String
+  
+  isRead    Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+  
+  @@index([storeId])
+  @@index([isRead])
+}
+
+enum NotificationType {
+  LOW_STOCK
+  ORDER_READY
+  SYSTEM_ALERT
+  PAYMENT_ERROR
+}
+
+// ===== AUDIT LOGS =====
+model AuditLog {
+  id        String   @id @default(cuid())
+  
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  action    String
+  resource  String
+  details   String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([storeId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
