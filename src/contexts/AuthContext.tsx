@@ -127,7 +127,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Fetch store details
     try {
-      const response = await fetch(`/api/stores/${id}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/stores/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         if (data.data) {
