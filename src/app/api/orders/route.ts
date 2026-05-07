@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
+import { getUserId } from '@/lib/tenancy/get-user-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { orderBroadcaster } from '@/lib/realtime/OrderBroadcaster';
 
@@ -67,6 +68,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Extract the current cashier's user ID from JWT token
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json(
+        errorResponse('UNAUTHORIZED', 'User ID not found. Authentication required.'),
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { staffId, items, notes, paymentMethod } = body;
 
@@ -90,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Creating order with:', {
       storeId,
-      staffId: null,
+      staffId: userId,
       itemsCount: items.length,
       paymentMethod,
     });
@@ -142,7 +152,7 @@ export async function POST(request: NextRequest) {
       data: {
         orderNumber,
         storeId,
-        staffId: null,
+        staffId: userId,
         status: 'PENDING',
         items: {
           createMany: {
@@ -157,6 +167,13 @@ export async function POST(request: NextRequest) {
       },
       include: {
         items: true,
+        staff: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
