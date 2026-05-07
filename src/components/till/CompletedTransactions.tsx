@@ -52,8 +52,53 @@ export function CompletedTransactions({ isActive = false }: CompletedTransaction
   const [previousOrderCount, setPreviousOrderCount] = useState(0);
   const [showNotification, setShowNotification] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  
+  // Filter state
+  const [filterOrderNumber, setFilterOrderNumber] = useState('');
+  const [filterMinAmount, setFilterMinAmount] = useState('');
+  const [filterMaxAmount, setFilterMaxAmount] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterCashier, setFilterCashier] = useState('');
 
   const ITEMS_PER_PAGE = 10;
+
+  // Filter orders based on criteria
+  const filteredOrders = orders.filter((order) => {
+    // Filter by order number
+    if (filterOrderNumber && !order.orderNumber.toLowerCase().includes(filterOrderNumber.toLowerCase())) {
+      return false;
+    }
+
+    // Filter by amount range
+    if (filterMinAmount && order.total < parseFloat(filterMinAmount)) {
+      return false;
+    }
+    if (filterMaxAmount && order.total > parseFloat(filterMaxAmount)) {
+      return false;
+    }
+
+    // Filter by date range
+    if (filterStartDate) {
+      const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
+      if (orderDate < filterStartDate) {
+        return false;
+      }
+    }
+    if (filterEndDate) {
+      const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
+      if (orderDate > filterEndDate) {
+        return false;
+      }
+    }
+
+    // Filter by cashier name
+    if (filterCashier && !order.staff?.name.toLowerCase().includes(filterCashier.toLowerCase())) {
+      return false;
+    }
+
+    return true;
+  });
 
   useEffect(() => {
     fetchOrders();
@@ -198,8 +243,89 @@ export function CompletedTransactions({ isActive = false }: CompletedTransaction
       {/* Header */}
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-800">
-          Completed Transactions ({pagination?.total || 0})
+          Completed Transactions ({filteredOrders.length} of {pagination?.total || 0})
         </h3>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">Order Number</label>
+          <input
+            type="text"
+            placeholder="Search order..."
+            value={filterOrderNumber}
+            onChange={(e) => setFilterOrderNumber(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">Min Amount</label>
+          <input
+            type="number"
+            placeholder="Min"
+            value={filterMinAmount}
+            onChange={(e) => setFilterMinAmount(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">Max Amount</label>
+          <input
+            type="number"
+            placeholder="Max"
+            value={filterMaxAmount}
+            onChange={(e) => setFilterMaxAmount(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">From Date</label>
+          <input
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">To Date</label>
+          <input
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">Cashier Name</label>
+          <input
+            type="text"
+            placeholder="Search cashier..."
+            value={filterCashier}
+            onChange={(e) => setFilterCashier(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <button
+          onClick={() => {
+            setFilterOrderNumber('');
+            setFilterMinAmount('');
+            setFilterMaxAmount('');
+            setFilterStartDate('');
+            setFilterEndDate('');
+            setFilterCashier('');
+          }}
+          className="col-span-1 sm:col-span-2 lg:col-span-3 px-3 py-2 bg-gray-300 text-gray-700 rounded text-sm font-semibold hover:bg-gray-400 transition"
+        >
+          Clear Filters
+        </button>
       </div>
 
       {/* Table */}
@@ -207,7 +333,7 @@ export function CompletedTransactions({ isActive = false }: CompletedTransaction
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="sticky top-0 z-10 bg-gray-100 border-b border-gray-300">
-              <th className="text-left py-3 px-4 font-semibold text-gray-700">S/no</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700">Order Number</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-700">Cashier</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-700">Order Date & Time</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-700">Item</th>
@@ -217,15 +343,14 @@ export function CompletedTransactions({ isActive = false }: CompletedTransaction
             </tr>
           </thead>
           <tbody>
-            {orders.map((order, idx) => {
+            {filteredOrders.map((order) => {
               const isExpanded = expandedOrderId === order.id;
-              const startIndex = currentPage * ITEMS_PER_PAGE;
 
               return (
                 <React.Fragment key={`order-${order.id}`}>
                   {/* Main Row */}
                   <tr>
-                    <td className="py-3 px-4 text-gray-700">{startIndex + idx + 1}</td>
+                    <td className="py-3 px-4 text-gray-700 font-semibold">{order.orderNumber}</td>
                     <td className="py-3 px-4 text-gray-700">{order.staff?.name || 'System'}</td>
                     <td className="py-3 px-4 text-gray-700">
                       {new Date(order.createdAt).toLocaleString()}
@@ -322,6 +447,15 @@ export function CompletedTransactions({ isActive = false }: CompletedTransaction
             })}
           </tbody>
         </table>
+
+        {filteredOrders.length === 0 && orders.length > 0 && (
+          <div className="flex items-center justify-center h-32">
+            <div className="text-center text-gray-500">
+              <p className="text-sm font-semibold">No matching transactions found</p>
+              <p className="text-xs">Try adjusting your filters</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
