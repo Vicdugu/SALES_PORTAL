@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
     console.log('[Login] Store data being returned:', {
       storeId: user.store?.id,
       storeName: user.store?.name,
-      logo: user.store?.logo ? 'present' : 'null',
       backgroundImage: user.store?.backgroundImage ? 'present' : 'null',
       primaryColor: user.store?.primaryColor,
       secondaryColor: user.store?.secondaryColor,

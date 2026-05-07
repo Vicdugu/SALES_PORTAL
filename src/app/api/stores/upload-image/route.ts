@@ -7,9 +7,9 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 /**
- * POST /api/stores/upload-image - Upload store branding images
+ * POST /api/stores/upload-image - Upload store branding image (background/wallpaper)
  * Only ADMIN users can upload images
- * Supports: logo, backgroundImage
+ * Supports: backgroundImage
  */
 export async function POST(request: NextRequest) {
   try {
@@ -67,9 +67,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!imageType || !['logo', 'backgroundImage'].includes(imageType)) {
+    if (!imageType || !['backgroundImage'].includes(imageType)) {
       return NextResponse.json(
-        errorResponse('VALIDATION_ERROR', 'Invalid image type. Use "logo" or "backgroundImage"'),
+        errorResponse('VALIDATION_ERROR', 'Invalid image type. Use "backgroundImage"'),
         { status: 400 }
       );
     }
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       successResponse({
-        message: 'Image uploaded successfully',
+        message: 'Background image uploaded successfully',
         dataUrl,
         size: file.size,
         type: file.type,

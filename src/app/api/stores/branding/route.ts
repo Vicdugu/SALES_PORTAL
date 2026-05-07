@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
-        logo: true,
         backgroundImage: true,
         primaryColor: true,
         secondaryColor: true,
@@ -113,7 +112,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { logo, backgroundImage, primaryColor, secondaryColor, accentColor } = body;
+    const { backgroundImage, primaryColor, secondaryColor, accentColor } = body;
 
     // Validate color formats (simple check for hex colors)
     const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
@@ -136,7 +135,6 @@ export async function PUT(request: NextRequest) {
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
       data: {
-        ...(logo !== undefined && { logo }),
         ...(backgroundImage !== undefined && { backgroundImage }),
         ...(primaryColor !== undefined && { primaryColor }),
         ...(secondaryColor !== undefined && { secondaryColor }),
@@ -145,7 +143,6 @@ export async function PUT(request: NextRequest) {
       select: {
         id: true,
         name: true,
-        logo: true,
         backgroundImage: true,
         primaryColor: true,
         secondaryColor: true,
@@ -154,12 +151,10 @@ export async function PUT(request: NextRequest) {
     });
 
     // Determine event type and broadcast update to all connected clients
-    let eventType: 'logoUpdate' | 'wallpaperUpdate' | 'colorsUpdate' | 'fullUpdate' = 'fullUpdate';
-    if (logo !== undefined && backgroundImage === undefined && !primaryColor && !secondaryColor && !accentColor) {
-      eventType = 'logoUpdate';
-    } else if (backgroundImage !== undefined && logo === undefined && !primaryColor && !secondaryColor && !accentColor) {
+    let eventType: 'wallpaperUpdate' | 'colorsUpdate' | 'fullUpdate' = 'fullUpdate';
+    if (backgroundImage !== undefined && !primaryColor && !secondaryColor && !accentColor) {
       eventType = 'wallpaperUpdate';
-    } else if ((primaryColor || secondaryColor || accentColor) && logo === undefined && backgroundImage === undefined) {
+    } else if ((primaryColor || secondaryColor || accentColor) && backgroundImage === undefined) {
       eventType = 'colorsUpdate';
     }
 
@@ -167,7 +162,6 @@ export async function PUT(request: NextRequest) {
     brandingBroadcaster.broadcast({
       type: eventType,
       storeId,
-      logo: updatedStore.logo,
       backgroundImage: updatedStore.backgroundImage,
       primaryColor: updatedStore.primaryColor,
       secondaryColor: updatedStore.secondaryColor,

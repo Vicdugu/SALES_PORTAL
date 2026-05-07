@@ -7,7 +7,6 @@ interface Store {
   name: string;
   email: string;
   currency: string;
-  logo?: string;
   backgroundImage?: string;
   primaryColor?: string;
   secondaryColor?: string;

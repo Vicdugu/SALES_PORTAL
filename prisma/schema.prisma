@@ -19,7 +19,6 @@ model Store {
   phone     String?
   
   // Branding
-  logo           String?  // Store logo URL
   backgroundImage String? // Store wallpaper/background URL
   primaryColor   String   @default("#000000")
   secondaryColor String   @default("#ffffff")

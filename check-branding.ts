@@ -9,7 +9,6 @@ async function checkBranding() {
       select: {
         id: true,
         name: true,
-        logo: true,
         backgroundImage: true,
         primaryColor: true,
         secondaryColor: true,

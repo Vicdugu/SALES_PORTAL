@@ -52,7 +52,6 @@ async function getMigrationSQL(): Promise<string> {
         "email" TEXT NOT NULL,
         "address" TEXT,
         "phone" TEXT,
-        "logo" TEXT,
         "backgroundImage" TEXT,
         "primaryColor" TEXT NOT NULL DEFAULT '#000000',
         "secondaryColor" TEXT NOT NULL DEFAULT '#ffffff',

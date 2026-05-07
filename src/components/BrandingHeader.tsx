@@ -10,7 +10,6 @@ export function BrandingHeader() {
   if (!store) return null;
 
   // Use store data directly, no API calls
-  const logo = store.logo;
   const backgroundImage = store.backgroundImage;
   const primaryColor = store.primaryColor || '#000000';
   const secondaryColor = store.secondaryColor || '#ffffff';
@@ -39,33 +38,17 @@ export function BrandingHeader() {
 
       {/* Content Container */}
       <div className="relative z-10 p-8 flex items-center justify-between h-full">
-        {/* Logo and Store Name */}
+        {/* Store Initial and Store Name */}
         <div className="flex items-center gap-6">
-          {logo ? (
-            <div className="w-24 h-24 bg-white rounded-xl p-2 shadow-xl flex items-center justify-center flex-shrink-0 border-2 border-white/50 overflow-hidden">
-              <img
-                key={`logo-${logo}`}
-                src={`${logo}${logo.includes('?') ? '&' : '?'}t=${Date.now()}`}
-                alt={store.name}
-                className="w-full h-full object-scale-down max-w-full max-h-full"
-                style={{ objectFit: 'scale-down' }}
-                onError={(e) => {
-                  console.error('Logo failed to load');
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-          ) : (
-            <div
-              className="w-24 h-24 rounded-xl shadow-xl flex items-center justify-center text-white text-4xl font-bold flex-shrink-0 border-2"
-              style={{ 
-                backgroundColor: primaryColor,
-                borderColor: 'rgba(255, 255, 255, 0.5)'
-              }}
-            >
-              {store.name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <div
+            className="w-24 h-24 rounded-xl shadow-xl flex items-center justify-center text-white text-4xl font-bold flex-shrink-0 border-2"
+            style={{ 
+              backgroundColor: primaryColor,
+              borderColor: 'rgba(255, 255, 255, 0.5)'
+            }}
+          >
+            {store.name.charAt(0).toUpperCase()}
+          </div>
 
           <div>
             <h1 className="text-3xl font-bold text-white drop-shadow-md">

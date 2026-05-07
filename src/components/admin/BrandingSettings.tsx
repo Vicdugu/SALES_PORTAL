@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiCall } from '@/lib/api/client';
 
 interface BrandingData {
-  logo?: string;
   backgroundImage?: string;
   primaryColor: string;
   secondaryColor: string;
@@ -17,18 +16,16 @@ export function BrandingSettings() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [branding, setBranding] = useState<BrandingData>({
-    logo: store?.logo,
     backgroundImage: store?.backgroundImage,
     primaryColor: store?.primaryColor || '#000000',
     secondaryColor: store?.secondaryColor || '#ffffff',
     accentColor: store?.accentColor || '#0066cc',
   });
-  const [logoPreview, setLogoPreview] = useState<string | null>(store?.logo || null);
   const [bgPreview, setBgPreview] = useState<string | null>(store?.backgroundImage || null);
 
   const handleImageUpload = async (
     file: File,
-    imageType: 'logo' | 'backgroundImage'
+    imageType: 'backgroundImage'
   ) => {
     try {
       setLoading(true);
@@ -50,20 +47,16 @@ export function BrandingSettings() {
             [imageType]: dataUrl,
           }));
 
-          if (imageType === 'logo') {
-            setLogoPreview(dataUrl);
-          } else {
-            setBgPreview(dataUrl);
-          }
+          setBgPreview(dataUrl);
 
-          setMessage({ type: 'success', text: `${imageType === 'logo' ? 'Logo' : 'Background'} uploaded successfully` });
+          setMessage({ type: 'success', text: `Background uploaded successfully` });
         }
       } else {
         const data = await response.json();
-        setMessage({ type: 'error', text: data.error?.message || `Failed to upload ${imageType === 'logo' ? 'logo' : 'background'}` });
+        setMessage({ type: 'error', text: data.error?.message || `Failed to upload background` });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: `Failed to upload ${imageType === 'logo' ? 'logo' : 'background'}` });
+      setMessage({ type: 'error', text: `Failed to upload background` });
       console.error('Upload error:', error);
     } finally {
       setLoading(false);
@@ -84,7 +77,6 @@ export function BrandingSettings() {
         if (data.success && data.data) {
           // Update the store context with the new branding data
           updateStore({
-            logo: data.data.logo,
             backgroundImage: data.data.backgroundImage,
             primaryColor: data.data.primaryColor,
             secondaryColor: data.data.secondaryColor,
@@ -104,15 +96,13 @@ export function BrandingSettings() {
     }
   };
 
-  const handleRemoveImage = (imageType: 'logo' | 'backgroundImage') => {
+  const handleRemoveImage = (imageType: 'backgroundImage') => {
     setBranding((prev) => ({
       ...prev,
       [imageType]: undefined,
     }));
 
-    if (imageType === 'logo') {
-      setLogoPreview(null);
-    } else {
+    if (imageType === 'backgroundImage') {
       setBgPreview(null);
     }
   };
@@ -131,68 +121,6 @@ export function BrandingSettings() {
           {message.text}
         </div>
       )}
-
-      {/* Logo Upload */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <span>🏪</span> Store Logo
-        </h3>
-        <p className="text-gray-600 text-sm mb-4">
-          Upload your store logo (recommended: square image, max 5MB)
-        </p>
-
-        <div className="flex gap-6">
-          {/* Preview */}
-          <div className="flex-shrink-0">
-            <div className="w-32 h-32 bg-gray-100 rounded-lg border-2 border-gray-300 flex items-center justify-center overflow-hidden">
-              {logoPreview ? (
-                <img 
-                  src={logoPreview} 
-                  alt="Logo preview" 
-                  className="w-full h-full object-contain" 
-                  onLoad={() => console.log('Logo preview loaded')}
-                  onError={(e) => console.error('Logo preview failed to load:', e)}
-                />
-              ) : (
-                <span className="text-gray-400 text-4xl">📷</span>
-              )}
-            </div>
-            {logoPreview && (
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                ✓ Logo ready
-              </p>
-            )}
-          </div>
-
-          {/* Upload Controls */}
-          <div className="flex-1 flex flex-col justify-center gap-4">
-            <label className="flex items-center justify-center w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition">
-              <span className="text-sm font-medium text-gray-700">Choose image...</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    handleImageUpload(e.target.files[0], 'logo');
-                  }
-                }}
-                disabled={loading}
-              />
-            </label>
-
-            {logoPreview && (
-              <button
-                onClick={() => handleRemoveImage('logo')}
-                className="px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition"
-                disabled={loading}
-              >
-                Remove Logo
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Background Upload */}
       <div className="bg-white rounded-lg shadow-md p-6">
@@ -414,27 +342,17 @@ export function BrandingSettings() {
 
           {/* Content Container */}
           <div className="relative z-10 p-8 flex items-center justify-between h-full">
-            {/* Logo and Store Name */}
+            {/* Store Initial and Store Name */}
             <div className="flex items-center gap-6">
-              {logoPreview ? (
-                <div className="w-24 h-24 bg-white rounded-xl p-3 shadow-xl flex items-center justify-center flex-shrink-0 border-2 border-white/50">
-                  <img
-                    src={logoPreview}
-                    alt="Logo"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div
-                  className="w-24 h-24 rounded-xl shadow-xl flex items-center justify-center text-white text-4xl font-bold flex-shrink-0 border-2"
-                  style={{ 
-                    backgroundColor: branding.primaryColor,
-                    borderColor: 'rgba(255, 255, 255, 0.5)'
-                  }}
-                >
-                  Q
-                </div>
-              )}
+              <div
+                className="w-24 h-24 rounded-xl shadow-xl flex items-center justify-center text-white text-4xl font-bold flex-shrink-0 border-2"
+                style={{ 
+                  backgroundColor: branding.primaryColor,
+                  borderColor: 'rgba(255, 255, 255, 0.5)'
+                }}
+              >
+                Q
+              </div>
 
               <div>
                 <h2 className="text-3xl font-bold text-white drop-shadow-md">
@@ -462,7 +380,7 @@ export function BrandingSettings() {
         </div>
 
         <p className="text-xs text-gray-500 mt-3">
-          <strong>Note:</strong> Logo and wallpaper are optional. If not provided, the store initial and gradient will be used.
+          <strong>Note:</strong> Wallpaper is optional. If not provided, a gradient based on your primary and secondary colors will be used.
         </p>
       </div>
     </div>

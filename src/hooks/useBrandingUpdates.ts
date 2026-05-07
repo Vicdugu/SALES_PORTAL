@@ -23,7 +23,7 @@ export function useBrandingUpdates() {
         // Verify this is for the current store
         if (data.storeId === storeId) {
           // Force a hard refresh to update all branding across the page
-          // This ensures changes like logo, colors, and wallpaper are immediately visible
+          // This ensures changes like colors and wallpaper are immediately visible
           window.location.reload();
         }
       } catch (err) {

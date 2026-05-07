@@ -10,7 +10,6 @@ interface Store {
   id: string;
   name: string;
   email: string;
-  logo?: string;
 }
 
 export default function Home() {
@@ -159,13 +158,6 @@ export default function Home() {
                   onClick={() => handleStoreSelect(store.id)}
                   className="bg-white rounded-lg shadow hover:shadow-lg transition-all p-6 text-left transform hover:scale-105 group"
                 >
-                  {store.logo && (
-                    <img
-                      src={store.logo}
-                      alt={store.name}
-                      className="w-full h-40 object-cover rounded mb-4 group-hover:opacity-90 transition"
-                    />
-                  )}
                   <h3 className="text-xl font-semibold text-gray-900 mb-1">{store.name}</h3>
                   <p className="text-gray-500 text-sm">{store.email}</p>
                 </button>

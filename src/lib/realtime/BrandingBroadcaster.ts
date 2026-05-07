@@ -1,12 +1,11 @@
 // Branding event broadcaster for real-time store branding updates
 // Uses a simple in-memory pub/sub system compatible with Next.js
 
-export type BrandingEventType = 'logoUpdate' | 'wallpaperUpdate' | 'colorsUpdate' | 'fullUpdate';
+export type BrandingEventType = 'wallpaperUpdate' | 'colorsUpdate' | 'fullUpdate';
 
 export interface BrandingEvent {
   type: BrandingEventType;
   storeId: string;
-  logo?: string | null;
   backgroundImage?: string | null;
   primaryColor?: string;
   secondaryColor?: string;
