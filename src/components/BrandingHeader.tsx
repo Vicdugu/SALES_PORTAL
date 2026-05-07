@@ -44,7 +44,8 @@ export function BrandingHeader() {
           {logo ? (
             <div className="w-24 h-24 bg-white rounded-xl p-3 shadow-xl flex items-center justify-center flex-shrink-0 border-2 border-white/50">
               <img
-                src={logo}
+                key={`logo-${logo}`}
+                src={`${logo}${logo.includes('?') ? '&' : '?'}t=${Date.now()}`}
                 alt={store.name}
                 className="w-full h-full object-contain"
                 onError={(e) => {
