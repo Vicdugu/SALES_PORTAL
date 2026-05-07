@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
     const offset = parseInt(url.searchParams.get('offset') || '0');
 
-    // Fetch completed orders with their items
+    // Fetch completed orders with their items and staff info
     const orders = await prisma.order.findMany({
       where: {
         storeId,
@@ -39,6 +39,12 @@ export async function GET(request: NextRequest) {
         paymentMethod: true,
         createdAt: true,
         completedAt: true,
+        staff: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         items: {
           select: {
             id: true,

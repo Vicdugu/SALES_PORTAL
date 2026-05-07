@@ -10,11 +10,12 @@ import { InventoryManagement } from '@/components/admin/InventoryManagement';
 import { TransactionHistory } from '@/components/admin/TransactionHistory';
 import { BrandingSettings } from '@/components/admin/BrandingSettings';
 import { BrandingHeader } from '@/components/BrandingHeader';
+import { CompletedTransactions } from '@/components/till/CompletedTransactions';
 import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
 
 export const dynamic = 'force-dynamic';
 
-type AdminTab = 'analytics' | 'staff' | 'inventory' | 'settings' | 'cleanup' | 'transactions';
+type AdminTab = 'analytics' | 'staff' | 'inventory' | 'settings' | 'completed' | 'cleanup' | 'transactions';
 
 export default function AdminPage() {
   const { user, store, isLoading } = useAuth();
@@ -189,6 +190,17 @@ export default function AdminPage() {
               >
                 ⚙️ Store Settings
               </button>
+              <button
+                onClick={() => handleTabChange('completed')}
+                style={{
+                  borderLeftColor: activeTab === 'completed' ? primaryColor : 'transparent',
+                  color: activeTab === 'completed' ? primaryColor : (theme === 'dark' ? '#c5cad3' : '#4B5563'),
+                  backgroundColor: activeTab === 'completed' ? (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                }}
+                className="py-4 px-4 border-l-4 font-semibold transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 will-change-colors text-left rounded-l"
+              >
+                📦 Completed Transactions
+              </button>
               {user.role === 'SUPERADMIN' && (
                 <>
                   <button
@@ -301,6 +313,13 @@ export default function AdminPage() {
           {activeTab === 'settings' && (
             <div>
               <BrandingSettings />
+            </div>
+          )}
+
+          {/* Completed Transactions Tab */}
+          {activeTab === 'completed' && (
+            <div className="h-[600px]">
+              <CompletedTransactions isActive={activeTab === 'completed'} />
             </div>
           )}
 

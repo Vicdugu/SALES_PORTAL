@@ -12,6 +12,11 @@ interface OrderItem {
   unitPrice: number;
 }
 
+interface StaffMember {
+  id: string;
+  name: string;
+}
+
 interface CompletedOrder {
   id: string;
   orderNumber: string;
@@ -22,6 +27,7 @@ interface CompletedOrder {
   paymentMethod: string;
   createdAt: string;
   completedAt: string;
+  staff: StaffMember | null;
   items: OrderItem[];
 }
 
@@ -202,6 +208,7 @@ export function CompletedTransactions({ isActive = false }: CompletedTransaction
           <thead>
             <tr className="sticky top-0 z-10 bg-gray-100 border-b border-gray-300">
               <th className="text-left py-3 px-4 font-semibold text-gray-700">S/no</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700">Cashier</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-700">Order Date & Time</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-700">Item</th>
               <th className="text-center py-3 px-4 font-semibold text-gray-700">Quantity</th>
@@ -219,6 +226,7 @@ export function CompletedTransactions({ isActive = false }: CompletedTransaction
                   {/* Main Row */}
                   <tr>
                     <td className="py-3 px-4 text-gray-700">{startIndex + idx + 1}</td>
+                    <td className="py-3 px-4 text-gray-700">{order.staff?.name || 'System'}</td>
                     <td className="py-3 px-4 text-gray-700">
                       {new Date(order.createdAt).toLocaleString()}
                     </td>
@@ -257,6 +265,9 @@ export function CompletedTransactions({ isActive = false }: CompletedTransaction
                             <div>
                               <p className="font-semibold text-gray-800">
                                 Order #{order.orderNumber}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Cashier: {order.staff?.name || 'System'}
                               </p>
                               <p className="text-xs text-gray-500">
                                 Payment: {order.paymentMethod || 'N/A'}
