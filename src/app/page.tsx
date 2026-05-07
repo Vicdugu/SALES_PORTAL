@@ -51,7 +51,9 @@ export default function Home() {
   };
 
   const handleStoreSelect = async (id: string) => {
-    await selectStore(id);
+    // Find the store from the fetched stores list
+    const selectedStore = stores.find(s => s.id === id);
+    await selectStore(id, selectedStore as any);
     const route = getRouteForRole(user?.role);
     router.push(route);
   };

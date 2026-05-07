@@ -28,7 +28,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  selectStore: (storeId: string) => void;
+  selectStore: (storeId: string, storeData?: Store) => Promise<void>;
   updateStore: (updatedStore: Partial<Store>) => void;
 }
 
@@ -121,11 +121,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('store');
   };
 
-  const selectStore = async (id: string) => {
+  const selectStore = async (id: string, storeData?: Store) => {
     setStoreId(id);
     localStorage.setItem('storeId', id);
     
-    // Fetch store details
+    // If store data is provided, use it directly
+    if (storeData) {
+      setStore(storeData);
+      localStorage.setItem('store', JSON.stringify(storeData));
+      return;
+    }
+    
+    // Otherwise, fetch store details from API
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/stores/${id}`, {
