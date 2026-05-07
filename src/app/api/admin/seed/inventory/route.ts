@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
           storeId: store.id,
           name: {
             equals: item.name,
-            mode: 'insensitive',
           },
         },
       });

@@ -111,7 +111,6 @@ export async function POST(request: NextRequest) {
         where: {
           name: {
             contains: storeName,
-            mode: 'insensitive',
           },
           email: {
             endsWith: '@example.com',

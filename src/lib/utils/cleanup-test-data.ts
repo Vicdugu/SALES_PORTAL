@@ -62,7 +62,6 @@ export async function removeSpecificTestStore(storeName: string) {
       where: {
         name: {
           contains: storeName,
-          mode: 'insensitive',
         },
       },
     });

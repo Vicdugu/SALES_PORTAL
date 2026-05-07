@@ -33,7 +33,6 @@ export async function seedSampleInventory() {
           storeId: store.id,
           name: {
             equals: item.name,
-            mode: 'insensitive',
           },
         },
       });
