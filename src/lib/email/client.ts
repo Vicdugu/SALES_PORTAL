@@ -1,22 +1,11 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-// Debug logging for SMTP configuration
-console.log('SMTP Configuration:', {
-  host: process.env.SMTP_HOST || 'localhost',
-  port: process.env.SMTP_PORT || '1025',
-  secure: process.env.SMTP_SECURE === 'true',
-  user: process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 10)}***` : 'undefined',
-  hasPassword: !!process.env.SMTP_PASSWORD,
-});
+// Initialize Resend with API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'localhost',
-  port: parseInt(process.env.SMTP_PORT || '1025'),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: process.env.SMTP_USER && process.env.SMTP_PASSWORD ? {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  } : undefined,
+console.log('[EMAIL] Resend initialized:', {
+  apiKeyConfigured: !!process.env.RESEND_API_KEY,
+  fromEmail: process.env.EMAIL_FROM || 'noreply@salesportal.com',
 });
 
 export interface EmailOptions {
@@ -30,21 +19,28 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const from = process.env.EMAIL_FROM || 'noreply@salesportal.com';
     
     console.log(`[EMAIL] Sending to ${options.to} from ${from}`);
+    console.log(`[EMAIL] Subject: ${options.subject}`);
     
-    const info = await transporter.sendMail({
+    const result = await resend.emails.send({
       from,
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
 
-    console.log(`[EMAIL] Sent successfully: ${info.messageId}`);
+    if (result.error) {
+      console.error(`[EMAIL] ✗ Resend error:`, result.error);
+      return false;
+    }
+
+    console.log(`[EMAIL] ✓ Sent successfully to ${options.to}, ID: ${result.data?.id}`);
     return true;
   } catch (error) {
-    console.error('[EMAIL] Error sending email:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    console.error('[EMAIL] ✗ Error sending email:', error);
+    if (error instanceof Error) {
+      console.error('[EMAIL] Error message:', error.message);
+      console.error('[EMAIL] Error stack:', error.stack);
+    }
     return false;
   }
 }
