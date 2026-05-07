@@ -167,10 +167,7 @@ export default function Home() {
                     />
                   )}
                   <h3 className="text-xl font-semibold text-gray-900 mb-1">{store.name}</h3>
-                  <p className="text-gray-500 text-sm mb-3">{store.email}</p>
-                  <p style={{ color: primaryColor }} className="font-semibold text-sm">
-                    Click to access {getRoleLabel(user?.role).toLowerCase()}
-                  </p>
+                  <p className="text-gray-500 text-sm">{store.email}</p>
                 </button>
               ))}
             </div>
