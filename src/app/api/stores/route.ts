@@ -138,6 +138,17 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Initialize database on first request (if needed)
+    if (!migrationAttempted) {
+      migrationAttempted = true;
+      try {
+        await runMigrations();
+      } catch (migrationError) {
+        console.warn('Migration check failed:', migrationError);
+        // Continue anyway - schema might already exist
+      }
+    }
+
     const body = await request.json();
     const { name, email, password, address, phone, currency } = body;
 
