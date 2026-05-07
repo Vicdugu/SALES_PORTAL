@@ -43,13 +43,13 @@ async function getMigrationSQL(): Promise<string> {
   // This is the SQL from 0_init migration
   return `
     -- CreateEnum
-    CREATE TYPE IF NOT EXISTS "Role" AS ENUM ('STAFF', 'KITCHEN', 'ADMIN', 'SUPERADMIN');
+    CREATE TYPE "Role" AS ENUM ('STAFF', 'KITCHEN', 'ADMIN', 'SUPERADMIN');
 
     -- CreateEnum
-    CREATE TYPE IF NOT EXISTS "OrderStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED');
+    CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED');
 
     -- CreateEnum
-    CREATE TYPE IF NOT EXISTS "NotificationType" AS ENUM ('LOW_STOCK', 'ORDER_READY', 'SYSTEM_ALERT', 'PAYMENT_ERROR');
+    CREATE TYPE "NotificationType" AS ENUM ('LOW_STOCK', 'ORDER_READY', 'SYSTEM_ALERT', 'PAYMENT_ERROR');
 
     -- CreateTable Store
     CREATE TABLE IF NOT EXISTS "Store" (
