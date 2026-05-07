@@ -50,8 +50,8 @@ export default function Home() {
     }
   };
 
-  const handleStoreSelect = (id: string) => {
-    selectStore(id);
+  const handleStoreSelect = async (id: string) => {
+    await selectStore(id);
     const route = getRouteForRole(user?.role);
     router.push(route);
   };

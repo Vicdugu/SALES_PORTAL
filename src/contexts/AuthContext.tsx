@@ -121,9 +121,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('store');
   };
 
-  const selectStore = (id: string) => {
+  const selectStore = async (id: string) => {
     setStoreId(id);
     localStorage.setItem('storeId', id);
+    
+    // Fetch store details
+    try {
+      const response = await fetch(`/api/stores/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data) {
+          setStore(data.data);
+          localStorage.setItem('store', JSON.stringify(data.data));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch store:', error);
+    }
   };
 
   const updateStore = (updatedStore: Partial<Store>) => {
