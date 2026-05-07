@@ -53,6 +53,8 @@ export default function Home() {
 
   const getRoleIcon = (role?: string) => {
     switch (role) {
+      case 'SUPERADMIN':
+        return '🔐';
       case 'ADMIN':
         return '👨‍💼';
       case 'KITCHEN':
@@ -65,6 +67,8 @@ export default function Home() {
 
   const getRoleLabel = (role?: string) => {
     switch (role) {
+      case 'SUPERADMIN':
+        return 'System Admin';
       case 'ADMIN':
         return 'Admin Dashboard';
       case 'KITCHEN':
@@ -78,6 +82,7 @@ export default function Home() {
   const getRouteForRole = (role?: string) => {
     switch (role) {
       case 'ADMIN':
+      case 'SUPERADMIN':
         return '/admin';
       case 'KITCHEN':
         return '/kitchen';
