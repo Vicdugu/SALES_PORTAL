@@ -86,12 +86,6 @@ export function BrandingHeader() {
           </span>
         </div>
       </div>
-
-      {/* Accent Bar */}
-      <div
-        className="h-2"
-        style={{ backgroundColor: accentColor }}
-      ></div>
     </div>
   );
 }
