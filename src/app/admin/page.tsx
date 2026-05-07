@@ -76,6 +76,31 @@ export default function AdminPage() {
     return <div className="p-8 text-red-600">Access denied. Admin only.</div>;
   }
 
+  // SUPERADMIN without a store - needs to select a store first
+  if (user.role === 'SUPERADMIN' && !store) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-12 rounded-lg shadow-lg max-w-md">
+          <h1 className="text-2xl font-bold mb-4">System Administrator</h1>
+          <p className="text-gray-600 mb-6">
+            As a super admin, please select a store from the store selection page to manage it.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Go to Store Selection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular ADMIN without store - should not happen, but protect anyway
+  if (!store) {
+    return <div className="p-8 text-red-600">No store assigned. Please contact support.</div>;
+  }
+
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
