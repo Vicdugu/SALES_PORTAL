@@ -1,0 +1,14 @@
+{
+  "buildCommand": "prisma migrate deploy && next build",
+  "devCommand": "next dev",
+  "installCommand": "npm install",
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
+}
