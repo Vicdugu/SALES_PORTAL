@@ -26,20 +26,31 @@ export async function runMigrations() {
     
     const prismaClient = getPrismaInstance();
 
-    // Check if Store table exists
+    // Check if Store table exists by querying information_schema
     try {
-      await prismaClient.store.count();
-      console.log('Schema already initialized - Store table exists');
-      return { success: true, message: 'Schema already initialized', alreadyInitialized: true };
-    } catch (storeError: any) {
-      console.log('Store table does not exist, creating schema...');
+      const tableExists = await prismaClient.$queryRaw<Array<{exists: boolean}>>`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'Store'
+        ) as exists
+      `;
       
-      // Run migrations manually by executing the SQL
-      const migrationSQL = await getMigrationSQL();
-      await applyMigrationSQL(prismaClient, migrationSQL);
-      
-      return { success: true, message: 'Schema created successfully', initialized: true };
+      if (tableExists && tableExists[0]?.exists) {
+        console.log('Schema already initialized - Store table exists');
+        return { success: true, message: 'Schema already initialized', alreadyInitialized: true };
+      }
+    } catch (checkError: any) {
+      console.log('Table check error (expected on first run):', checkError.message);
     }
+    
+    // Table doesn't exist, create it
+    console.log('Store table does not exist, creating schema...');
+    const migrationSQL = await getMigrationSQL();
+    await applyMigrationSQL(prismaClient, migrationSQL);
+    
+    console.log('Schema created successfully');
+    return { success: true, message: 'Schema created successfully', initialized: true };
   } catch (error: any) {
     console.error('Migration error:', error);
     throw error;
