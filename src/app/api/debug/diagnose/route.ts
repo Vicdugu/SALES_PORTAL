@@ -139,12 +139,21 @@ export async function GET(request: NextRequest) {
     const prismaClient = getPrisma();
     const sql = await getMigrationSQL();
     
+    console.log(`[DIAGNOSE] SQL length: ${sql.length} characters`);
+    console.log(`[DIAGNOSE] Semicolon count: ${(sql.match(/;/g) || []).length}`);
+    
     const statements = sql
       .split(';')
       .map((s) => s.trim())
       .filter((s) => s && !s.startsWith('--'));
     
-    console.log(`[DIAGNOSE] Total statements: ${statements.length}`);
+    console.log(`[DIAGNOSE] Total statements after split: ${statements.length}`);
+    
+    // Log first few statements
+    for (let i = 0; i < Math.min(3, statements.length); i++) {
+      const preview = statements[i].substring(0, 50).replace(/\n/g, ' ');
+      console.log(`[DIAGNOSE] Statement ${i + 1}: ${preview}`);
+    }
     
     const results = [];
     let successCount = 0;
@@ -163,7 +172,6 @@ export async function GET(request: NextRequest) {
           status: 'success',
         });
         successCount++;
-        console.log(`[DIAGNOSE] ✓ Success`);
       } catch (error: any) {
         const errorMsg = error?.message || String(error);
         const code = error?.code || 'UNKNOWN';
@@ -186,8 +194,6 @@ export async function GET(request: NextRequest) {
         if (!isIdempotent) {
           errorCount++;
         }
-        
-        console.error(`[DIAGNOSE] ✗ ${isIdempotent ? 'Skipped' : 'ERROR'}: ${errorMsg.substring(0, 80)}`);
       }
     }
     
@@ -196,6 +202,7 @@ export async function GET(request: NextRequest) {
       totalStatements: statements.length,
       successCount,
       errorCount,
+      resultCount: results.length,
       results,
     });
   } catch (error: any) {
