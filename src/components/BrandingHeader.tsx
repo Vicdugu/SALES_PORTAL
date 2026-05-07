@@ -42,12 +42,13 @@ export function BrandingHeader() {
         {/* Logo and Store Name */}
         <div className="flex items-center gap-6">
           {logo ? (
-            <div className="w-24 h-24 bg-white rounded-xl p-3 shadow-xl flex items-center justify-center flex-shrink-0 border-2 border-white/50">
+            <div className="w-24 h-24 bg-white rounded-xl p-2 shadow-xl flex items-center justify-center flex-shrink-0 border-2 border-white/50 overflow-hidden">
               <img
                 key={`logo-${logo}`}
                 src={`${logo}${logo.includes('?') ? '&' : '?'}t=${Date.now()}`}
                 alt={store.name}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-scale-down max-w-full max-h-full"
+                style={{ objectFit: 'scale-down' }}
                 onError={(e) => {
                   console.error('Logo failed to load');
                   (e.target as HTMLImageElement).style.display = 'none';
