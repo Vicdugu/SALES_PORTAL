@@ -55,9 +55,10 @@ export async function GET(request: NextRequest) {
       ? { id: storeId }
       : { id: 'invalid-no-store-id' }; // Return no results if storeId is null
 
-    const stores = await prisma.store.findMany({
-      where: whereClause,
-      select: {
+    try {
+      const stores = await prisma.store.findMany({
+        where: whereClause,
+        select: {
         id: true,
         name: true,
         email: true,
@@ -78,6 +79,51 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(successResponse(stores));
+    } catch (error: any) {
+      console.error('Error fetching stores:', error);
+      
+      // Check if this is a schema missing error
+      if (error.message?.includes('does not exist') || error.code === 'P1001') {
+        // Try to run migrations and retry
+        try {
+          await runMigrations();
+          // Retry the query after migration
+          const stores = await prisma.store.findMany({
+            where: whereClause,
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              address: true,
+              phone: true,
+              isActive: true,
+              createdAt: true,
+              _count: {
+                select: {
+                  users: true,
+                  orders: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          });
+          return NextResponse.json(successResponse(stores));
+        } catch (migrationError) {
+          console.error('Migration failed:', migrationError);
+          return NextResponse.json(
+            errorResponse('DATABASE_ERROR', 'Database initialization failed'),
+            { status: 503 }
+          );
+        }
+      }
+      
+      return NextResponse.json(
+        errorResponse('INTERNAL_ERROR', 'Failed to fetch stores'),
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error fetching stores:', error);
     return NextResponse.json(

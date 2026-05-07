@@ -1,41 +1,34 @@
 import { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient | null = null;
+
+function getPrismaInstance(): PrismaClient {
+  if (!prisma) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    prisma = new PrismaClient({
+      log: ['error'],
+    });
+  }
+  return prisma;
+}
 
 export async function runMigrations() {
   try {
+    if (!process.env.DATABASE_URL) {
+      console.log('DATABASE_URL not set, skipping migration');
+      return { success: false, message: 'DATABASE_URL not configured' };
+    }
+
     console.log('Checking if migrations need to be applied...');
     
-    // Check if _prisma_migrations table exists
-    try {
-      const migrations = await prisma.$queryRaw`
-        SELECT * FROM "_prisma_migrations" LIMIT 1
-      `;
-      console.log('Migrations table exists');
-    } catch (checkError: any) {
-      // Migrations table doesn't exist, need to create it
-      console.log('Creating _prisma_migrations table...');
-      
-      await prisma.$executeRaw`
-        CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
-          id SERIAL PRIMARY KEY,
-          checksum VARCHAR(64) NOT NULL,
-          finished_at TIMESTAMP,
-          execution_time BIGINT NOT NULL,
-          requires_backup BOOLEAN NOT NULL DEFAULT false,
-          migration_name VARCHAR(255) NOT NULL UNIQUE,
-          logs TEXT,
-          rolled_back_at TIMESTAMP,
-          started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          applied_steps_count INTEGER NOT NULL DEFAULT 0
-        )
-      `;
-    }
+    const prismaClient = getPrismaInstance();
 
     // Check if Store table exists
     try {
-      await prisma.store.count();
+      await prismaClient.store.count();
       console.log('Schema already initialized - Store table exists');
       return { success: true, message: 'Schema already initialized', alreadyInitialized: true };
     } catch (storeError: any) {
@@ -43,7 +36,7 @@ export async function runMigrations() {
       
       // Run migrations manually by executing the SQL
       const migrationSQL = await getMigrationSQL();
-      await applyMigrationSQL(prisma, migrationSQL);
+      await applyMigrationSQL(prismaClient, migrationSQL);
       
       return { success: true, message: 'Schema created successfully', initialized: true };
     }
@@ -258,7 +251,7 @@ async function getMigrationSQL(): Promise<string> {
   `;
 }
 
-async function applyMigrationSQL(prisma: PrismaClient, sql: string) {
+async function applyMigrationSQL(prismaClient: PrismaClient, sql: string) {
   // Split the SQL by statements and execute each one
   const statements = sql
     .split(';')
@@ -267,7 +260,7 @@ async function applyMigrationSQL(prisma: PrismaClient, sql: string) {
 
   for (const statement of statements) {
     try {
-      await prisma.$executeRawUnsafe(statement);
+      await prismaClient.$executeRawUnsafe(statement);
       console.log('Executed:', statement.substring(0, 50) + '...');
     } catch (error: any) {
       // Some statements might fail if objects already exist, continue
@@ -282,8 +275,10 @@ async function applyMigrationSQL(prisma: PrismaClient, sql: string) {
 
 export async function initializeDatabase() {
   try {
+    const prismaClient = getPrismaInstance();
+
     // Test connection
-    await prisma.$executeRaw`SELECT 1`;
+    await prismaClient.$executeRaw`SELECT 1`;
     console.log('Database connection successful');
     
     // Run migrations
@@ -293,7 +288,5 @@ export async function initializeDatabase() {
   } catch (error) {
     console.error('Database initialization failed:', error);
     throw error;
-  } finally {
-    await prisma.$disconnect();
   }
 }
