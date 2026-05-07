@@ -18,7 +18,7 @@ interface User {
   email: string;
   name: string;
   role: 'STAFF' | 'KITCHEN' | 'ADMIN' | 'SUPERADMIN';
-  storeId: string;
+  storeId: string | null;
 }
 
 interface AuthContextType {
@@ -94,7 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { user, token, store } = data.data;
     setUser(user);
     setStoreId(user.storeId);
-    setStore(store || { id: user.storeId, name: '', email: '', currency: 'USD' });
+    // For superadmin with no store selected, don't set a default store
+    if (store) {
+      setStore(store);
+      localStorage.setItem('store', JSON.stringify(store));
+    } else if (user.storeId) {
+      setStore({ id: user.storeId, name: '', email: '', currency: 'USD' });
+    }
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
     // Only set storeId in localStorage if it's not null (for superadmins, storeId is null)
@@ -102,9 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('storeId', user.storeId);
     } else {
       localStorage.removeItem('storeId');
-    }
-    if (store) {
-      localStorage.setItem('store', JSON.stringify(store));
     }
   };
 
