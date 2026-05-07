@@ -46,10 +46,10 @@ export default function KitchenPage() {
             <p className="text-gray-600">Staff: {user.name}</p>
           </div>
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.back()}
             className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
           >
-            Logout
+            ← Back
           </button>
         </div>
       </div>
