@@ -1,41 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { runMigrations } from '@/lib/db/migrations';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('[DEBUG] Connection test endpoint called');
+    console.log('[DEBUG] Running full migration test');
     
-    // Try importing Prisma
-    try {
-      const { getPrisma } = await import('@/lib/db/client');
-      console.log('[DEBUG] ✓ Prisma client imported successfully');
-      
-      // Try getting the Prisma instance
-      const prismaClient = getPrisma();
-      console.log('[DEBUG] ✓ Prisma client instantiated');
-      
-      // Try a basic SQL query that doesn't reference any tables
-      await prismaClient.$executeRawUnsafe('SELECT 1');
-      console.log('[DEBUG] ✓ Basic SQL query executed');
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Prisma connection working',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (prismaError: any) {
-      console.error('[DEBUG] Prisma error:', prismaError?.message);
-      return NextResponse.json({
-        success: false,
-        error: 'Prisma error: ' + (prismaError?.message || String(prismaError)),
-        stack: prismaError?.stack,
-        timestamp: new Date().toISOString(),
-      }, { status: 500 });
-    }
+    const result = await runMigrations();
+    
+    console.log('[DEBUG] Migration result:', result);
+    
+    return NextResponse.json({
+      success: true,
+      migrationResult: result,
+      timestamp: new Date().toISOString(),
+    });
   } catch (error: any) {
-    console.error('[DEBUG] Endpoint error:', error);
+    console.error('[DEBUG] Migration error:', error);
     return NextResponse.json({
       success: false,
       error: error?.message || String(error),
+      code: error?.code,
+      meta: error?.meta,
       timestamp: new Date().toISOString(),
     }, { status: 500 });
   }
