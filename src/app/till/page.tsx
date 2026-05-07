@@ -28,7 +28,7 @@ interface InventoryItem {
 }
 
 export default function TillPage() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const store = useStore();
   const primaryColor = store?.primaryColor || '#000000';
   const currencySymbol = getCurrencySymbol(store.currency);
@@ -142,8 +142,9 @@ export default function TillPage() {
     setRefreshCount((prev) => prev + 1);
   };
 
-  if (!user) {
-    return <div className="p-8">Loading...</div>;
+  // Show nothing while auth is loading to avoid flashing messages
+  if (isLoading || !user) {
+    return null;
   }
 
   return (

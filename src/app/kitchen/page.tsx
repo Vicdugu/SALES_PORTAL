@@ -10,7 +10,7 @@ import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
 export const dynamic = 'force-dynamic';
 
 export default function KitchenPage() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const store = useStore();
   const primaryColor = store?.primaryColor || '#000000';
   const router = useRouter();
@@ -18,6 +18,11 @@ export default function KitchenPage() {
 
   // Listen for real-time branding updates and refresh when changes occur
   useBrandingUpdates();
+
+  // Show nothing while auth is loading to avoid flashing access denied
+  if (isLoading) {
+    return null;
+  }
 
   if (!user || user.role !== 'KITCHEN') {
     return <div className="p-8 text-red-600">Access denied. Kitchen staff only.</div>;

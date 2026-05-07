@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 type AdminTab = 'analytics' | 'staff' | 'inventory' | 'settings' | 'cleanup' | 'transactions';
 
 export default function AdminPage() {
-  const { user, store } = useAuth();
+  const { user, store, isLoading } = useAuth();
   const router = useRouter();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [activeTab, setActiveTab] = useState<AdminTab>('analytics');
@@ -65,6 +65,11 @@ export default function AdminPage() {
   const handleTabChange = useCallback((tab: AdminTab) => {
     setActiveTab(tab);
   }, []);
+
+  // Show nothing while auth is loading to avoid flashing access denied
+  if (isLoading) {
+    return null;
+  }
 
   if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN')) {
     return <div className="p-8 text-red-600">Access denied. Admin only.</div>;
