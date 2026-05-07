@@ -61,15 +61,17 @@ export function BrandingHeader() {
         </div>
 
         {/* Store Info Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-5 py-3 rounded-xl border-2 shadow-lg"
-          style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            borderColor: 'rgba(255, 255, 255, 0.9)',
-          }}>
-          <span className="text-white text-sm font-bold tracking-wide drop-shadow-md">
-            📍 {store.id.slice(0, 8)}...
-          </span>
-        </div>
+        {store && (
+          <div className="hidden sm:flex items-center gap-2 px-5 py-3 rounded-xl border-2 shadow-lg"
+            style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+              borderColor: 'rgba(255, 255, 255, 0.9)',
+            }}>
+            <span className="text-white text-sm font-bold tracking-wide drop-shadow-md">
+              📍 {store.id.slice(0, 8)}...
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
