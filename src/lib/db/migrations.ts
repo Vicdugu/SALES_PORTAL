@@ -26,16 +26,21 @@ export async function runMigrations() {
     
     const prismaClient = getPrismaInstance();
 
-    // Check if Store table exists using raw SQL query
+    // Check if Store table exists using $queryRaw
     let tableExists = false;
     try {
-      const result = await prismaClient.$queryRawUnsafe(
-        `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Store')`
-      );
+      const result = await prismaClient.$queryRawUnsafe(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'Store'
+        )
+      `) as any[];
+      
       tableExists = result && Array.isArray(result) && result[0] && result[0].exists === true;
       console.log('[DB] Table check result:', { tableExists, result });
     } catch (checkError: any) {
-      console.log('[DB] Table check query failed (may be first run):', checkError.message);
+      console.log('[DB] Table check query failed:', checkError?.message || String(checkError));
       tableExists = false;
     }
     
@@ -62,16 +67,16 @@ async function getMigrationSQL(): Promise<string> {
   // This is the SQL from 0_init migration
   return `
     -- CreateEnum
-    CREATE TYPE "Role" AS ENUM ('STAFF', 'KITCHEN', 'ADMIN', 'SUPERADMIN');
+    CREATE TYPE IF NOT EXISTS "Role" AS ENUM ('STAFF', 'KITCHEN', 'ADMIN', 'SUPERADMIN');
 
     -- CreateEnum
-    CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED');
+    CREATE TYPE IF NOT EXISTS "OrderStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED');
 
     -- CreateEnum
-    CREATE TYPE "NotificationType" AS ENUM ('LOW_STOCK', 'ORDER_READY', 'SYSTEM_ALERT', 'PAYMENT_ERROR');
+    CREATE TYPE IF NOT EXISTS "NotificationType" AS ENUM ('LOW_STOCK', 'ORDER_READY', 'SYSTEM_ALERT', 'PAYMENT_ERROR');
 
     -- CreateTable Store
-    CREATE TABLE "Store" (
+    CREATE TABLE IF NOT EXISTS "Store" (
         "id" TEXT NOT NULL,
         "name" TEXT NOT NULL,
         "email" TEXT NOT NULL,
@@ -94,7 +99,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable User
-    CREATE TABLE "User" (
+    CREATE TABLE IF NOT EXISTS "User" (
         "id" TEXT NOT NULL,
         "email" TEXT NOT NULL,
         "password" TEXT NOT NULL,
@@ -109,7 +114,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable StaffMember
-    CREATE TABLE "StaffMember" (
+    CREATE TABLE IF NOT EXISTS "StaffMember" (
         "id" TEXT NOT NULL,
         "userId" TEXT NOT NULL,
         "storeId" TEXT NOT NULL,
@@ -122,7 +127,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable "Order"
-    CREATE TABLE "Order" (
+    CREATE TABLE IF NOT EXISTS "Order" (
         "id" TEXT NOT NULL,
         "orderNumber" TEXT NOT NULL,
         "storeId" TEXT NOT NULL,
@@ -141,7 +146,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable OrderItem
-    CREATE TABLE "OrderItem" (
+    CREATE TABLE IF NOT EXISTS "OrderItem" (
         "id" TEXT NOT NULL,
         "orderId" TEXT NOT NULL,
         "name" TEXT NOT NULL,
@@ -153,7 +158,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable InventoryItem
-    CREATE TABLE "InventoryItem" (
+    CREATE TABLE IF NOT EXISTS "InventoryItem" (
         "id" TEXT NOT NULL,
         "storeId" TEXT NOT NULL,
         "name" TEXT NOT NULL,
@@ -171,7 +176,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable InventoryUsage
-    CREATE TABLE "InventoryUsage" (
+    CREATE TABLE IF NOT EXISTS "InventoryUsage" (
         "id" TEXT NOT NULL,
         "itemId" TEXT NOT NULL,
         "quantity" DOUBLE PRECISION NOT NULL,
@@ -182,7 +187,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable Notification
-    CREATE TABLE "Notification" (
+    CREATE TABLE IF NOT EXISTS "Notification" (
         "id" TEXT NOT NULL,
         "storeId" TEXT NOT NULL,
         "type" "NotificationType" NOT NULL,
@@ -196,7 +201,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable AuditLog
-    CREATE TABLE "AuditLog" (
+    CREATE TABLE IF NOT EXISTS "AuditLog" (
         "id" TEXT NOT NULL,
         "storeId" TEXT NOT NULL,
         "userId" TEXT NOT NULL,
@@ -209,7 +214,7 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateTable "Transaction"
-    CREATE TABLE "Transaction" (
+    CREATE TABLE IF NOT EXISTS "Transaction" (
         "id" TEXT NOT NULL,
         "storeId" TEXT NOT NULL,
         "orderId" TEXT,
