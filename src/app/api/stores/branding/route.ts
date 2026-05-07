@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/client';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { getTokenFromHeader, verifyToken } from '@/lib/auth/jwt';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
+import { brandingBroadcaster } from '@/lib/realtime/BrandingBroadcaster';
 
 /**
  * GET /api/stores/branding - Get store branding information
@@ -150,6 +151,28 @@ export async function PUT(request: NextRequest) {
         secondaryColor: true,
         accentColor: true,
       },
+    });
+
+    // Determine event type and broadcast update to all connected clients
+    let eventType: 'logoUpdate' | 'wallpaperUpdate' | 'colorsUpdate' | 'fullUpdate' = 'fullUpdate';
+    if (logo !== undefined && backgroundImage === undefined && !primaryColor && !secondaryColor && !accentColor) {
+      eventType = 'logoUpdate';
+    } else if (backgroundImage !== undefined && logo === undefined && !primaryColor && !secondaryColor && !accentColor) {
+      eventType = 'wallpaperUpdate';
+    } else if ((primaryColor || secondaryColor || accentColor) && logo === undefined && backgroundImage === undefined) {
+      eventType = 'colorsUpdate';
+    }
+
+    // Broadcast the update to all connected staff members
+    brandingBroadcaster.broadcast({
+      type: eventType,
+      storeId,
+      logo: updatedStore.logo,
+      backgroundImage: updatedStore.backgroundImage,
+      primaryColor: updatedStore.primaryColor,
+      secondaryColor: updatedStore.secondaryColor,
+      accentColor: updatedStore.accentColor,
+      timestamp: Date.now(),
     });
 
     return NextResponse.json(

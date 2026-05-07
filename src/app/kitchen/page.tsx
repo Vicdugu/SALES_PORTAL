@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth, useStore } from '@/contexts/AuthContext';
 import { BrandingHeader } from '@/components/BrandingHeader';
 import { OrderQueue } from '@/components/kitchen/OrderQueue';
+import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,9 @@ export default function KitchenPage() {
   const primaryColor = store?.primaryColor || '#000000';
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Listen for real-time branding updates and refresh when changes occur
+  useBrandingUpdates();
 
   if (!user || user.role !== 'KITCHEN') {
     return <div className="p-8 text-red-600">Access denied. Kitchen staff only.</div>;

@@ -10,6 +10,7 @@ import { InventoryManagement } from '@/components/admin/InventoryManagement';
 import { TransactionHistory } from '@/components/admin/TransactionHistory';
 import { BrandingSettings } from '@/components/admin/BrandingSettings';
 import { BrandingHeader } from '@/components/BrandingHeader';
+import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,9 @@ export default function AdminPage() {
   const router = useRouter();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [activeTab, setActiveTab] = useState<AdminTab>('analytics');
+  
+  // Listen for real-time branding updates and refresh when changes occur
+  useBrandingUpdates();
   
   // Get store branding colors
   const primaryColor = store?.primaryColor || '#000000';

@@ -13,6 +13,7 @@ import { ReadyOrders } from '@/components/till/ReadyOrders';
 import { StoreCurrencyBadge } from '@/components/StoreCurrencyBadge';
 import { BrandingHeader } from '@/components/BrandingHeader';
 import { getCurrencySymbol } from '@/lib/utils/currency';
+import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
 
 type TabType = 'pos' | 'ready' | 'transactions';
 
@@ -33,6 +34,9 @@ export default function TillPage() {
   const currencySymbol = getCurrencySymbol(store.currency);
   const router = useRouter();
   const { items, addItem, subtotal, tax, total, clearCart } = useOrderStore();
+
+  // Listen for real-time branding updates and refresh when changes occur
+  useBrandingUpdates();
 
   const [activeTab, setActiveTab] = useState<TabType>('pos');
   const [showPayment, setShowPayment] = useState(false);
