@@ -22,41 +22,17 @@ export async function runMigrations() {
       return { success: false, message: 'DATABASE_URL not configured' };
     }
 
-    console.log('[DB] Starting database migration check...');
+    console.log('[DB] Starting database migration...');
     
     const prismaClient = getPrismaInstance();
 
-    // Check if Store table exists using $queryRaw
-    let tableExists = false;
-    try {
-      const result = await prismaClient.$queryRawUnsafe(`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = 'Store'
-        )
-      `) as any[];
-      
-      tableExists = result && Array.isArray(result) && result[0] && result[0].exists === true;
-      console.log('[DB] Table check result:', { tableExists, result });
-    } catch (checkError: any) {
-      console.log('[DB] Table check query failed:', checkError?.message || String(checkError));
-      tableExists = false;
-    }
-    
-    if (tableExists) {
-      console.log('[DB] Schema already initialized - Store table exists');
-      return { success: true, message: 'Schema already initialized', alreadyInitialized: true };
-    }
-    
-    // Table doesn't exist, create it
-    console.log('[DB] Store table not found, creating schema...');
+    // Get the migration SQL and apply it
     const migrationSQL = await getMigrationSQL();
-    console.log('[DB] Starting SQL migration...');
+    console.log('[DB] Executing migration SQL...');
     await applyMigrationSQL(prismaClient, migrationSQL);
     
-    console.log('[DB] Schema created successfully');
-    return { success: true, message: 'Schema created successfully', initialized: true };
+    console.log('[DB] Migration complete');
+    return { success: true, message: 'Migration executed successfully' };
   } catch (error: any) {
     console.error('[DB] Migration error:', error);
     throw error;
@@ -282,26 +258,30 @@ async function applyMigrationSQL(prismaClient: PrismaClient, sql: string) {
   let successCount = 0;
   let skipCount = 0;
   
-  for (const statement of statements) {
+  for (let i = 0; i < statements.length; i++) {
+    const statement = statements[i];
     try {
       await prismaClient.$executeRawUnsafe(statement);
       successCount++;
-      console.log(`[DB] ✓ Executed: ${statement.substring(0, 60).replace(/\n/g, ' ')}...`);
+      const preview = statement.substring(0, 80).replace(/\n/g, ' ');
+      console.log(`[DB] ✓ [${i + 1}/${statements.length}] Executed: ${preview}`);
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
+      const preview = statement.substring(0, 80).replace(/\n/g, ' ');
+      
       // Some statements might fail if objects already exist, continue
       if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
         skipCount++;
-        console.log(`[DB] ⊘ Skipped (already exists): ${statement.substring(0, 60)}`);
+        console.log(`[DB] ⊘ [${i + 1}/${statements.length}] Skipped (already exists): ${preview}`);
       } else {
-        console.error(`[DB] ✗ Failed to execute: ${statement.substring(0, 60)}`);
-        console.error(`[DB] Error details:`, error);
+        console.error(`[DB] ✗ [${i + 1}/${statements.length}] Failed: ${preview}`);
+        console.error(`[DB] Error:`, errorMsg);
         throw error;
       }
     }
   }
   
-  console.log(`[DB] Migration complete: ${successCount} executed, ${skipCount} skipped`);
+  console.log(`[DB] Migration complete: ${successCount} executed, ${skipCount} skipped out of ${statements.length} statements`);
 }
 
 export async function initializeDatabase() {
