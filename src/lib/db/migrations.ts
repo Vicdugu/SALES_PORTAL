@@ -257,40 +257,47 @@ async function applyMigrationSQL(prismaClient: PrismaClient, sql: string) {
 
   let successCount = 0;
   let skipCount = 0;
+  let errorCount = 0;
   
   for (let i = 0; i < statements.length; i++) {
     const statement = statements[i];
+    const preview = statement.substring(0, 80).replace(/\n/g, ' ');
+    
     try {
       await prismaClient.$executeRawUnsafe(statement);
       successCount++;
-      const preview = statement.substring(0, 80).replace(/\n/g, ' ');
-      console.log(`[DB] ✓ [${i + 1}/${statements.length}] Executed: ${preview}`);
+      console.log(`[DB] ✓ [${i + 1}/${statements.length}] SUCCESS: ${preview}`);
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
-      const preview = statement.substring(0, 80).replace(/\n/g, ' ');
+      const errorCode = error?.code || '';
       
       // Skip errors for already-existing objects (types, tables, indexes, constraints)
-      // PostgreSQL error codes: 42P07 (duplicate table), 42723 (duplicate function/type)
+      // PostgreSQL error codes: 42P07 (duplicate table), 42723 (duplicate function/type), 42710 (type exists)
       if (
         errorMsg.includes('already exists') || 
         errorMsg.includes('duplicate') ||
         errorMsg.includes('42P07') ||
         errorMsg.includes('42723') ||
+        errorMsg.includes('42710') ||
         errorMsg.includes('does not exist') // Skip "does not exist" errors on DROP/ALTER
       ) {
         skipCount++;
-        console.log(`[DB] ⊘ [${i + 1}/${statements.length}] Skipped (idempotent): ${preview}`);
-        continue; // Continue to next statement
+        console.log(`[DB] ⊘ [${i + 1}/${statements.length}] SKIP (idempotent): ${preview}`);
+        continue;
       }
       
-      // For other errors, log but still continue for now to create as much as possible
-      console.error(`[DB] ⚠ [${i + 1}/${statements.length}] Error (continuing): ${preview}`);
-      console.error(`[DB] Error details:`, errorMsg);
-      skipCount++;
+      // For other errors, log and STOP to identify the issue
+      errorCount++;
+      console.error(`[DB] ✗ [${i + 1}/${statements.length}] ERROR (STOPPING): ${preview}`);
+      console.error(`[DB] Error code: ${errorCode}`);
+      console.error(`[DB] Error msg: ${errorMsg}`);
+      
+      // Throw to see what's breaking
+      throw error;
     }
   }
   
-  console.log(`[DB] Migration complete: ${successCount} executed, ${skipCount} skipped/errored out of ${statements.length} statements`);
+  console.log(`[DB] Migration complete: ${successCount} success, ${skipCount} skipped, ${errorCount} errors`);
 }
 
 export async function initializeDatabase() {
