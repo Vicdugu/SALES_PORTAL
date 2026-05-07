@@ -153,7 +153,13 @@ export default function AdminPage() {
                 {theme === 'light' ? '🌙' : '☀️'}
               </button>
               <button
-                onClick={() => router.back()}
+                onClick={() => {
+                  if (user?.role === 'SUPERADMIN') {
+                    router.push('/'); // Go to store selection for superadmin
+                  } else {
+                    router.back(); // Go back for regular admins
+                  }
+                }}
                 className={`px-6 py-2 rounded-lg font-semibold transition ${
                   theme === 'dark'
                     ? 'bg-gray-700 hover:bg-gray-600 text-white'
