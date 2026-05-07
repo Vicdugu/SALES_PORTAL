@@ -1,92 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/db/client';
 
-async function getMigrationSQL(): Promise<string> {
-  return `
-    -- CreateEnum
-    CREATE TYPE IF NOT EXISTS "Role" AS ENUM ('STAFF', 'KITCHEN', 'ADMIN', 'SUPERADMIN');
-
-    -- CreateEnum
-    CREATE TYPE IF NOT EXISTS "OrderStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED');
-
-    -- CreateEnum
-    CREATE TYPE IF NOT EXISTS "NotificationType" AS ENUM ('LOW_STOCK', 'ORDER_READY', 'SYSTEM_ALERT', 'PAYMENT_ERROR');
-
-    -- CreateTable Store
-    CREATE TABLE IF NOT EXISTS "Store" (
-        "id" TEXT NOT NULL,
-        "name" TEXT NOT NULL,
-        "email" TEXT NOT NULL,
-        "address" TEXT,
-        "phone" TEXT,
-        "logo" TEXT,
-        "backgroundImage" TEXT,
-        "primaryColor" TEXT NOT NULL DEFAULT '#000000',
-        "secondaryColor" TEXT NOT NULL DEFAULT '#ffffff',
-        "accentColor" TEXT NOT NULL DEFAULT '#0066cc',
-        "currency" TEXT NOT NULL DEFAULT 'USD',
-        "isActive" BOOLEAN NOT NULL DEFAULT true,
-        "emailVerified" BOOLEAN NOT NULL DEFAULT false,
-        "verificationCode" TEXT,
-        "verificationCodeExpiry" TIMESTAMP(3),
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL,
-
-        CONSTRAINT "Store_pkey" PRIMARY KEY ("id")
-    );
-
-    -- CreateIndex
-    CREATE UNIQUE INDEX IF NOT EXISTS "Store_email_key" ON "Store"("email");
-  `;
-}
-
 export async function GET(request: NextRequest) {
   try {
-    console.log('[DEBUG] Migration test endpoint called');
+    console.log('[DEBUG] Simple migration test endpoint called');
     
     const prismaClient = getPrisma();
-    const migrationSQL = await getMigrationSQL();
     
-    const statements = migrationSQL
-      .split(';')
-      .map((stmt) => stmt.trim())
-      .filter((stmt) => stmt && !stmt.startsWith('--'));
+    // Test 1: Try to create a simple enum type
+    const testStatements = [
+      `CREATE TYPE IF NOT EXISTS "TestRole" AS ENUM ('ADMIN', 'USER');`,
+      `DROP TYPE IF EXISTS "TestRole";`,
+      `CREATE TABLE IF NOT EXISTS "TestTable" (id TEXT NOT NULL PRIMARY KEY);`,
+      `DROP TABLE IF EXISTS "TestTable";`,
+    ];
     
-    console.log(`[DEBUG] Found ${statements.length} statements to execute`);
-    
+    console.log('[DEBUG] Running test statements...');
     const results = [];
     
-    for (let i = 0; i < statements.length; i++) {
-      const statement = statements[i];
-      const preview = statement.substring(0, 100).replace(/\n/g, ' ');
-      
+    for (let i = 0; i < testStatements.length; i++) {
+      const stmt = testStatements[i];
       try {
-        await prismaClient.$executeRawUnsafe(statement);
-        results.push({
-          index: i + 1,
-          status: 'success',
-          preview,
-        });
-        console.log(`[DEBUG] ✓ Statement ${i + 1}: ${preview}`);
+        await prismaClient.$executeRawUnsafe(stmt);
+        results.push({ index: i + 1, stmt: stmt.substring(0, 50), status: 'success' });
+        console.log(`[DEBUG] ✓ Test ${i + 1}: ${stmt.substring(0, 50)}`);
       } catch (error: any) {
-        results.push({
-          index: i + 1,
+        results.push({ 
+          index: i + 1, 
+          stmt: stmt.substring(0, 50), 
           status: 'error',
-          preview,
-          error: error?.message || String(error),
+          error: error?.message 
         });
-        console.error(`[DEBUG] ✗ Statement ${i + 1} failed:`, error?.message);
+        console.error(`[DEBUG] ✗ Test ${i + 1} failed:`, error?.message);
       }
     }
     
     return NextResponse.json({
       success: true,
-      totalStatements: statements.length,
+      totalTests: testStatements.length,
       results,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[DEBUG] Migration error:', error);
+    console.error('[DEBUG] Test error:', error);
     return NextResponse.json({
       success: false,
       error: error?.message || String(error),
