@@ -13,7 +13,7 @@ interface Store {
 }
 
 export default function Home() {
-  const { user, storeId, selectStore, logout } = useAuth();
+  const { user, storeId, selectStore, logout, isLoading } = useAuth();
   const store = useStore();
   const primaryColor = store?.primaryColor || '#000000';
   const router = useRouter();
@@ -21,6 +21,11 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isLoading) {
+      // Don't do anything while auth is loading
+      return;
+    }
+
     if (!user) {
       router.push('/login');
       return;
@@ -28,7 +33,7 @@ export default function Home() {
 
     // Fetch user's stores
     fetchStores();
-  }, [user, router]);
+  }, [user, isLoading, router]);
 
   const fetchStores = async () => {
     try {
@@ -103,7 +108,7 @@ export default function Home() {
     router.push('/login');
   };
 
-  if (loading) {
+  if (loading || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div>Loading...</div>
