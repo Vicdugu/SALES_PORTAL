@@ -1,5 +1,14 @@
 import nodemailer from 'nodemailer';
 
+// Debug logging for SMTP configuration
+console.log('SMTP Configuration:', {
+  host: process.env.SMTP_HOST || 'localhost',
+  port: process.env.SMTP_PORT || '1025',
+  secure: process.env.SMTP_SECURE === 'true',
+  user: process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 10)}***` : 'undefined',
+  hasPassword: !!process.env.SMTP_PASSWORD,
+});
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'localhost',
   port: parseInt(process.env.SMTP_PORT || '1025'),
@@ -20,16 +29,22 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     const from = process.env.EMAIL_FROM || 'noreply@salesportal.com';
     
-    await transporter.sendMail({
+    console.log(`[EMAIL] Sending to ${options.to} from ${from}`);
+    
+    const info = await transporter.sendMail({
       from,
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
 
+    console.log(`[EMAIL] Sent successfully: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('[EMAIL] Error sending email:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return false;
   }
 }
