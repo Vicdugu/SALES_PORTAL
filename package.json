@@ -21,6 +21,7 @@
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
+    "jspdf": "^4.2.1",
     "next": "16.2.4",
     "next-auth": "^4.24.14",
     "nodemailer": "^7.0.13",

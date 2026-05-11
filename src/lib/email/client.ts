@@ -1,12 +1,37 @@
-import { Resend } from 'resend';
+import { Resend } from "resend";
 
-// Initialize Resend with API key
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend | null = null;
 
-console.log('[EMAIL] Resend initialized:', {
-  apiKeyConfigured: !!process.env.RESEND_API_KEY,
-  fromEmail: process.env.EMAIL_FROM || 'noreply@salesportal.com',
-});
+function getResend() {
+  // Always try to initialize if we have the key
+  const apiKey = process.env.RESEND_API_KEY;
+  
+  if (!resend && apiKey) {
+    try {
+      resend = new Resend(apiKey);
+      console.log("[EMAIL] ✅ Resend instance created successfully");
+    } catch (err) {
+      console.error("[EMAIL] ❌ Failed to create Resend instance:", err);
+      return null;
+    }
+  }
+  
+  if (!apiKey) {
+    console.error("[EMAIL] ❌ RESEND_API_KEY environment variable not set");
+    console.error("[EMAIL] Available env vars:", Object.keys(process.env).filter(k => k.includes('RESEND') || k.includes('EMAIL')));
+  }
+  
+  return resend;
+}
+
+if (typeof process !== 'undefined' && process.env) {
+  console.log("[EMAIL] Module loaded - Environment check:", {
+    hasResendApiKey: !!process.env.RESEND_API_KEY,
+    apiKeyPreview: process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.substring(0, 10) + '...' : 'NOT SET',
+    fromEmail: process.env.EMAIL_FROM || "onboarding@resend.dev (default)",
+    nodeEnv: process.env.NODE_ENV,
+  });
+}
 
 export interface EmailOptions {
   to: string;
@@ -16,14 +41,19 @@ export interface EmailOptions {
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    // Use onboarding@resend.dev for testing, or configure a verified domain
-    const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+    const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
     
     console.log(`[EMAIL] Sending to ${options.to} from ${from}`);
     console.log(`[EMAIL] Subject: ${options.subject}`);
     console.log(`[EMAIL] Resend API Key configured: ${!!process.env.RESEND_API_KEY}`);
     
-    const result = await resend.emails.send({
+    const resendInstance = getResend();
+    if (!resendInstance) {
+      console.error("[EMAIL] Resend API Key is missing");
+      return false;
+    }
+
+    const result = await resendInstance.emails.send({
       from,
       to: options.to,
       subject: options.subject,
@@ -31,19 +61,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     });
 
     if (result.error) {
-      console.error(`[EMAIL] ✗ Resend API Error:`, result.error);
-      console.error(`[EMAIL] Error type:`, result.error);
+      console.error("[EMAIL] Resend API Error:", result.error);
       return false;
     }
 
-    console.log(`[EMAIL] ✓ Sent successfully to ${options.to}, Email ID: ${result.data?.id}`);
+    console.log(`[EMAIL] Sent successfully to ${options.to}, Email ID: ${result.data?.id}`);
     return true;
   } catch (error) {
-    console.error('[EMAIL] ✗ Exception sending email:', error);
-    if (error instanceof Error) {
-      console.error('[EMAIL] Message:', error.message);
-      console.error('[EMAIL] Stack:', error.stack?.substring(0, 200));
-    }
+    console.error("[EMAIL] Exception sending email:", error);
     return false;
   }
 }
@@ -53,56 +78,189 @@ export async function sendVerificationEmail(
   email: string,
   verificationCode: string
 ): Promise<boolean> {
-  console.log(`[EMAIL] sendVerificationEmail called with code: ${verificationCode}`);
-  
-  // Build HTML with the code included
-  const codeDisplay = verificationCode;
-  
   const html = `<!DOCTYPE html>
 <html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
-.container { max-width: 600px; margin: 20px auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }
-.header { background-color: #f39c12; color: white; padding: 30px 20px; text-align: center; }
-.header h1 { margin: 0; font-size: 24px; }
-.content { padding: 30px 20px; }
-.code-box { background-color: #fff3cd; border: 3px solid #f39c12; padding: 30px; text-align: center; border-radius: 8px; margin: 20px 0; }
-.code-box .code { font-size: 48px; font-weight: bold; color: #d67e22; letter-spacing: 8px; font-family: 'Courier New', monospace; }
-.footer { background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd; }
-</style>
-</head>
 <body>
-<div class="container">
-<div class="header">
-<h1>Welcome to Sales Portal! 🎉</h1>
-</div>
-<div class="content">
-<p>Hi <strong>${storeName}</strong>,</p>
-<p>Thank you for registering with Sales Portal! To complete your registration and activate your store, please verify your email address by entering the code below:</p>
-<div class="code-box">
-<p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">Your Verification Code:</p>
-<div class="code">${codeDisplay}</div>
-<p style="margin: 10px 0 0 0; color: #666; font-size: 12px;">This code will expire in 24 hours</p>
-</div>
-<p style="color: #666; font-size: 14px;">Enter this code on the verification page in your Sales Portal account.</p>
-<p style="color: #999; font-size: 12px; margin-top: 30px;">If you did not create this account, please ignore this email.</p>
-</div>
-<div class="footer">
-<p style="margin: 5px 0;">&copy; 2026 Sales Portal. All rights reserved.</p>
-<p style="margin: 5px 0;">Powered by Questbridge Ltd</p>
-</div>
-</div>
+  <h1>Welcome to Sales Portal!</h1>
+  <p>Hi <strong>${storeName}</strong>,</p>
+  <p>Your Verification Code: <strong>${verificationCode}</strong></p>
 </body>
 </html>`;
 
-  console.log(`[EMAIL] HTML includes code at position: ${html.indexOf(codeDisplay)}`);
-  
   return sendEmail({
     to: email,
-    subject: 'Your Sales Portal Verification Code',
+    subject: "Your Sales Portal Verification Code",
     html,
   });
+}
+
+export interface ReceiptEmailOptions {
+  to: string;
+  storeName: string;
+  orderNumber: string;
+  total: number;
+  currency: string;
+  pdfBuffer: Buffer;
+}
+
+export async function sendReceiptEmail(
+  options: ReceiptEmailOptions
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log("[EMAIL] sendReceiptEmail called with:", {
+      to: options.to,
+      storeName: options.storeName,
+      orderNumber: options.orderNumber,
+      pdfSize: options.pdfBuffer.length,
+    });
+
+    // Use verified custom email
+    const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
+    
+    console.log("[EMAIL] Configuration:", {
+      customFromConfigured: process.env.EMAIL_FROM,
+      usingFrom: from,
+      isVerified: !!process.env.EMAIL_FROM,
+    });
+
+    const resendInstance = getResend();
+
+    if (!resendInstance) {
+      const errMsg = "Resend instance not initialized";
+      console.error("[EMAIL] ❌", errMsg);
+      console.error("[EMAIL] Debug info:", {
+        hasResendApiKey: !!process.env.RESEND_API_KEY,
+        apiKeyLength: process.env.RESEND_API_KEY?.length,
+        hasEmailFrom: !!process.env.EMAIL_FROM,
+      });
+      return { success: false, error: errMsg };
+    }
+
+    console.log("[EMAIL] ✅ Resend instance available, proceeding with send...");
+
+    // Format currency symbol
+    let currencySymbol = "$";
+    const currencyMap: { [key: string]: string } = {
+      USD: "$",
+      EUR: "€",
+      GBP: "£",
+      JPY: "¥",
+      AUD: "A$",
+      CAD: "C$",
+      CHF: "CHF",
+      CNY: "¥",
+      INR: "₹",
+      MXN: "$",
+      ZAR: "R",
+      NGN: "₦",
+      GHS: "₵",
+      KES: "KSh",
+      EGP: "£",
+    };
+    currencySymbol = currencyMap[options.currency] || "$";
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .store-name { font-size: 24px; font-weight: bold; color: #2c3e50; }
+    .receipt-details { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    .receipt-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
+    .receipt-item.total { font-weight: bold; font-size: 18px; border-bottom: 2px solid #2c3e50; padding: 12px 0; }
+    .footer { text-align: center; color: #7f8c8d; font-size: 12px; margin-top: 30px; border-top: 1px solid #e0e0e0; padding-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="store-name">${options.storeName}</div>
+      <p style="margin: 10px 0 0 0; color: #7f8c8d;">Digital Receipt</p>
+    </div>
+    
+    <div class="receipt-details">
+      <div class="receipt-item">
+        <span>Order Number:</span>
+        <span>#${options.orderNumber}</span>
+      </div>
+      <div class="receipt-item">
+        <span>Date:</span>
+        <span>${new Date().toLocaleDateString()}</span>
+      </div>
+      <div class="receipt-item">
+        <span>Time:</span>
+        <span>${new Date().toLocaleTimeString()}</span>
+      </div>
+    </div>
+
+    <div class="receipt-details">
+      <div class="receipt-item total">
+        <span>Total Amount:</span>
+        <span>${currencySymbol}${options.total.toFixed(2)}</span>
+      </div>
+    </div>
+
+    <p style="text-align: center; color: #7f8c8d; font-size: 14px;">
+      A detailed receipt is attached as a PDF file.
+    </p>
+
+    <div class="footer">
+      <p>Thank you for your purchase!</p>
+      <p style="margin: 5px 0;">Please keep this email and attached receipt for your records.</p>
+      <p style="margin: 5px 0;">Generated on ${new Date().toLocaleString()}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    // Convert Buffer to base64 for Resend attachment
+    const base64Pdf = options.pdfBuffer.toString("base64");
+
+    console.log("[EMAIL] Preparing receipt email with PDF attachment...");
+    console.log("[EMAIL] PDF size:", options.pdfBuffer.length, "bytes");
+    console.log("[EMAIL] Recipient:", options.to);
+    console.log("[EMAIL] From:", from);
+
+    const result = await resendInstance.emails.send({
+      from,
+      to: options.to,
+      subject: `Receipt for Order #${options.orderNumber} from ${options.storeName}`,
+      html,
+      attachments: [
+        {
+          filename: `receipt_${options.orderNumber}.pdf`,
+          content: base64Pdf,
+        },
+      ],
+    });
+
+    console.log("[EMAIL] Resend API response received:", {
+      hasError: !!result.error,
+      hasData: !!result.data,
+      errorMessage: result.error?.message,
+      dataId: result.data?.id,
+    });
+
+    if (result.error) {
+      console.error("[EMAIL] ❌ Resend API Error:", result.error);
+      const errorMsg = `Resend error: ${result.error.message}`;
+      console.error("[EMAIL] Full error:", result.error);
+      return { success: false, error: errorMsg };
+    }
+
+    console.log(`[EMAIL] ✅ Receipt email sent successfully to ${options.to}`);
+    console.log(`[EMAIL] Email ID: ${result.data?.id}`);
+    return { success: true };
+  } catch (error) {
+    console.error("[EMAIL] ❌ Exception sending receipt email:", error);
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error("[EMAIL] Exception details:", {
+      type: typeof error,
+      errorConstructor: error?.constructor?.name,
+      message: errorMsg,
+    });
+    return { success: false, error: errorMsg };
+  }
 }

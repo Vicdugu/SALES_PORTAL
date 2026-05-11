@@ -42,3 +42,10 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# temp files
+temp_lines.txt
+build-output.log
+
+# test/utility scripts (not part of app)
+test-email-send.js
