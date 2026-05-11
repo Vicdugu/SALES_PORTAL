@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,14 +8,16 @@ import { StaffManagement } from '@/components/admin/StaffManagement';
 import { SystemCleanup } from '@/components/admin/SystemCleanup';
 import { InventoryManagement } from '@/components/admin/InventoryManagement';
 import { TransactionHistory } from '@/components/admin/TransactionHistory';
+import { PendingApprovals } from '@/components/admin/PendingApprovals';
 import { BrandingSettings } from '@/components/admin/BrandingSettings';
 import { BrandingHeader } from '@/components/BrandingHeader';
 import { CompletedTransactions } from '@/components/till/CompletedTransactions';
+import { AdvertPanel } from '@/components/AdvertPanel';
 import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
 
 export const dynamic = 'force-dynamic';
 
-type AdminTab = 'analytics' | 'staff' | 'inventory' | 'settings' | 'completed' | 'cleanup' | 'transactions';
+type AdminTab = 'analytics' | 'staff' | 'inventory' | 'settings' | 'completed' | 'cleanup' | 'transactions' | 'approvals';
 
 export default function AdminPage() {
   const { user, store, isLoading } = useAuth();
@@ -123,30 +125,30 @@ export default function AdminPage() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10">
+      <div className="relative z-10 flex flex-col min-h-screen">
         {/* Branding Header */}
         <div className="px-4 pt-4">
           <BrandingHeader />
         </div>
 
-        {/* Header */}
-        <div className={`${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white/80 border-white/60'} backdrop-blur-md border-b shadow-lg`}>
-          <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
-            <div>
-              <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+        {/* Main Header */}
+        <div className={`${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-300'} backdrop-blur-md border-b-2 shadow-lg`}>
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="w-full sm:w-auto">
+              <h1 className={`text-2xl sm:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-950'}`}>
                 {user.role === 'SUPERADMIN' ? '🔐 Superadmin Dashboard' : 'Admin Dashboard'}
               </h1>
-              <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+              <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-800'} font-semibold text-sm sm:text-base`}>
                 {user.role === 'SUPERADMIN' ? 'System Admin' : 'Admin'}: {user.name}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
               <button
                 onClick={toggleTheme}
-                className={`p-2 rounded-lg transition ${
+                className={`p-2 rounded-lg transition border font-bold ${
                   theme === 'dark'
-                    ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                    ? 'bg-gray-800 hover:bg-gray-700 text-yellow-300 border-gray-700'
+                    : 'bg-gray-300 hover:bg-gray-400 text-gray-900 border-gray-400'
                 }`}
                 title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
               >
@@ -160,10 +162,10 @@ export default function AdminPage() {
                     router.back(); // Go back for regular admins
                   }
                 }}
-                className={`px-6 py-2 rounded-lg font-semibold transition ${
+                className={`px-4 sm:px-6 py-2 rounded-lg font-bold transition border text-sm sm:text-base ${
                   theme === 'dark'
-                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                    : 'bg-gray-300 hover:bg-gray-400 text-gray-900'
+                    ? 'bg-gray-800 hover:bg-gray-700 text-white border-gray-700'
+                    : 'bg-gray-600 hover:bg-gray-700 text-white border-gray-700'
                 }`}
               >
                 ← Back
@@ -172,19 +174,109 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Main Content with Left Sidebar Tabs */}
-        <div className="flex min-h-screen">
-          {/* Left Sidebar Tabs */}
-          <div className={`${theme === 'dark' ? 'bg-gray-800/50 border-gray-700' : 'bg-white/50 border-white/60'} backdrop-blur-md border-r w-64`}>
+        {/* Mobile Tab Navigation */}
+        <div className={`md:hidden ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-20 overflow-x-auto`}>
+          <div className="flex flex-nowrap px-2 py-2 gap-1">
+            <button
+              onClick={() => handleTabChange('analytics')}
+              className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                activeTab === 'analytics'
+                  ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+              }`}
+            >
+              📊 Analytics
+            </button>
+            <button
+              onClick={() => handleTabChange('staff')}
+              className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                activeTab === 'staff'
+                  ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+              }`}
+            >
+              👥 Staff
+            </button>
+            <button
+              onClick={() => handleTabChange('inventory')}
+              className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                activeTab === 'inventory'
+                  ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+              }`}
+            >
+              🍔 Inventory
+            </button>
+            <button
+              onClick={() => handleTabChange('settings')}
+              className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                activeTab === 'settings'
+                  ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+              }`}
+            >
+              ⚙️ Settings
+            </button>
+            <button
+              onClick={() => handleTabChange('completed')}
+              className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                activeTab === 'completed'
+                  ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                  : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+              }`}
+            >
+              📦 Completed
+            </button>
+            {user.role === 'SUPERADMIN' && (
+              <>
+                <button
+                  onClick={() => handleTabChange('approvals')}
+                  className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                    activeTab === 'approvals'
+                      ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                      : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+                  }`}
+                >
+                  ⏳ Approvals
+                </button>
+                <button
+                  onClick={() => handleTabChange('transactions')}
+                  className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                    activeTab === 'transactions'
+                      ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                      : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+                  }`}
+                >
+                  📋 Transactions
+                </button>
+                <button
+                  onClick={() => handleTabChange('cleanup')}
+                  className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                    activeTab === 'cleanup'
+                      ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                      : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+                  }`}
+                >
+                  🧹 Cleanup
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Main Content with Left Sidebar Tabs (Desktop) and Content Area */}
+        <div className="flex flex-1">
+          {/* Left Sidebar Tabs - Desktop Only */}
+          <div className={`hidden md:flex flex-col ${theme === 'dark' ? 'bg-gray-900/70 border-gray-700' : 'bg-white border-gray-300'} backdrop-blur-md border-r-2 w-64 flex-shrink-0 overflow-y-auto`}>
             <div className="flex flex-col pt-4 px-2">
               <button
                 onClick={() => handleTabChange('analytics')}
                 style={{
                   borderLeftColor: activeTab === 'analytics' ? primaryColor : 'transparent',
-                  color: activeTab === 'analytics' ? primaryColor : (theme === 'dark' ? '#c5cad3' : '#4B5563'),
-                  backgroundColor: activeTab === 'analytics' ? (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                  color: activeTab === 'analytics' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                  backgroundColor: activeTab === 'analytics' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
                 }}
-                className="py-4 px-4 border-l-4 font-semibold transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 will-change-colors text-left rounded-l"
+                className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
               >
                 📊 Sales Analytics
               </button>
@@ -192,10 +284,10 @@ export default function AdminPage() {
                 onClick={() => handleTabChange('staff')}
                 style={{
                   borderLeftColor: activeTab === 'staff' ? primaryColor : 'transparent',
-                  color: activeTab === 'staff' ? primaryColor : (theme === 'dark' ? '#c5cad3' : '#4B5563'),
-                  backgroundColor: activeTab === 'staff' ? (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                  color: activeTab === 'staff' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                  backgroundColor: activeTab === 'staff' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
                 }}
-                className="py-4 px-4 border-l-4 font-semibold transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 will-change-colors text-left rounded-l"
+                className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
               >
                 👥 Staff Management
               </button>
@@ -203,10 +295,10 @@ export default function AdminPage() {
                 onClick={() => handleTabChange('inventory')}
                 style={{
                   borderLeftColor: activeTab === 'inventory' ? primaryColor : 'transparent',
-                  color: activeTab === 'inventory' ? primaryColor : (theme === 'dark' ? '#c5cad3' : '#4B5563'),
-                  backgroundColor: activeTab === 'inventory' ? (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                  color: activeTab === 'inventory' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                  backgroundColor: activeTab === 'inventory' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
                 }}
-                className="py-4 px-4 border-l-4 font-semibold transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 will-change-colors text-left rounded-l"
+                className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
               >
                 🍔 Meals & Drinks
               </button>
@@ -214,10 +306,10 @@ export default function AdminPage() {
                 onClick={() => handleTabChange('settings')}
                 style={{
                   borderLeftColor: activeTab === 'settings' ? primaryColor : 'transparent',
-                  color: activeTab === 'settings' ? primaryColor : (theme === 'dark' ? '#c5cad3' : '#4B5563'),
-                  backgroundColor: activeTab === 'settings' ? (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                  color: activeTab === 'settings' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                  backgroundColor: activeTab === 'settings' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
                 }}
-                className="py-4 px-4 border-l-4 font-semibold transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 will-change-colors text-left rounded-l"
+                className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
               >
                 ⚙️ Store Settings
               </button>
@@ -225,23 +317,34 @@ export default function AdminPage() {
                 onClick={() => handleTabChange('completed')}
                 style={{
                   borderLeftColor: activeTab === 'completed' ? primaryColor : 'transparent',
-                  color: activeTab === 'completed' ? primaryColor : (theme === 'dark' ? '#c5cad3' : '#4B5563'),
-                  backgroundColor: activeTab === 'completed' ? (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                  color: activeTab === 'completed' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                  backgroundColor: activeTab === 'completed' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
                 }}
-                className="py-4 px-4 border-l-4 font-semibold transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 will-change-colors text-left rounded-l"
+                className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
               >
                 📦 Completed Transactions
               </button>
               {user.role === 'SUPERADMIN' && (
                 <>
                   <button
+                    onClick={() => handleTabChange('approvals')}
+                    style={{
+                      borderLeftColor: activeTab === 'approvals' ? primaryColor : 'transparent',
+                      color: activeTab === 'approvals' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                      backgroundColor: activeTab === 'approvals' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
+                    }}
+                    className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
+                  >
+                    ⏳ Pending Approvals
+                  </button>
+                  <button
                     onClick={() => handleTabChange('transactions')}
                     style={{
                       borderLeftColor: activeTab === 'transactions' ? primaryColor : 'transparent',
-                      color: activeTab === 'transactions' ? primaryColor : (theme === 'dark' ? '#c5cad3' : '#4B5563'),
-                      backgroundColor: activeTab === 'transactions' ? (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                      color: activeTab === 'transactions' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                      backgroundColor: activeTab === 'transactions' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
                     }}
-                    className="py-4 px-4 border-l-4 font-semibold transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 will-change-colors text-left rounded-l"
+                    className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
                   >
                     📋 All Transactions
                   </button>
@@ -249,10 +352,10 @@ export default function AdminPage() {
                     onClick={() => handleTabChange('cleanup')}
                     style={{
                       borderLeftColor: activeTab === 'cleanup' ? primaryColor : 'transparent',
-                      color: activeTab === 'cleanup' ? primaryColor : (theme === 'dark' ? '#c5cad3' : '#4B5563'),
-                      backgroundColor: activeTab === 'cleanup' ? (theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                      color: activeTab === 'cleanup' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                      backgroundColor: activeTab === 'cleanup' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
                     }}
-                    className="py-4 px-4 border-l-4 font-semibold transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 will-change-colors text-left rounded-l"
+                    className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
                   >
                     🧹 System Cleanup
                   </button>
@@ -262,14 +365,14 @@ export default function AdminPage() {
           </div>
 
           {/* Main Content Area */}
-          <div className="flex-1 px-4 py-8">
-          {/* Analytics Tab */}
+          <div className="flex-1 px-2 sm:px-4 md:px-6 py-4 sm:py-6 overflow-y-auto">
+            {/* Analytics Tab */}
           {activeTab === 'analytics' && (
             <div>
               {/* Date Range Selector */}
-              <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-end">
-                <div className="flex-1">
-                  <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:gap-4 items-start sm:items-end">
+                <div className="flex-1 w-full">
+                  <label className={`block text-xs sm:text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
                     Start Date
                   </label>
                   <input
@@ -278,10 +381,8 @@ export default function AdminPage() {
                     onChange={(e) => setStartDate(e.target.value)}
                     style={{
                       borderColor: theme === 'dark' ? '#3a4456' : '#D1D5DB',
-                      '--input-border-focus': primaryColor,
-                      '--input-ring-focus': `${primaryColor}80`,
-                    } as React.CSSProperties & { '--input-border-focus': string; '--input-ring-focus': string }}
-                    className={`w-full px-4 py-2 rounded-lg font-medium transition ${
+                    } as React.CSSProperties}
+                    className={`w-full px-3 sm:px-4 py-2 rounded-lg font-medium text-sm transition ${
                       theme === 'dark'
                         ? 'bg-gray-800 border text-white focus:outline-none focus:ring-2'
                         : 'bg-white border text-gray-900 focus:outline-none focus:ring-2'
@@ -296,8 +397,8 @@ export default function AdminPage() {
                     }}
                   />
                 </div>
-                <div className="flex-1">
-                  <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+                <div className="flex-1 w-full">
+                  <label className={`block text-xs sm:text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
                     End Date
                   </label>
                   <input
@@ -307,7 +408,7 @@ export default function AdminPage() {
                     style={{
                       borderColor: theme === 'dark' ? '#3a4456' : '#D1D5DB',
                     }}
-                    className={`w-full px-4 py-2 rounded-lg font-medium transition ${
+                    className={`w-full px-3 sm:px-4 py-2 rounded-lg font-medium text-sm transition ${
                       theme === 'dark'
                         ? 'bg-gray-800 border text-white focus:outline-none focus:ring-2'
                         : 'bg-white border text-gray-900 focus:outline-none focus:ring-2'
@@ -322,7 +423,7 @@ export default function AdminPage() {
                     }}
                   />
                 </div>
-                <div className={`${theme === 'dark' ? 'bg-gray-700 border border-gray-600 text-gray-300' : 'bg-gray-100 border border-gray-300 text-gray-700'} px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap`}>
+                <div className={`${theme === 'dark' ? 'bg-gray-700 border border-gray-600 text-gray-300' : 'bg-gray-100 border border-gray-300 text-gray-700'} px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap`}>
                   {days} {days === 1 ? 'day' : 'days'}
                 </div>
               </div>
@@ -349,7 +450,7 @@ export default function AdminPage() {
 
           {/* Completed Transactions Tab */}
           {activeTab === 'completed' && (
-            <div className="h-[600px]">
+            <div className="h-auto sm:h-[600px] md:h-[600px]">
               <CompletedTransactions isActive={activeTab === 'completed'} />
             </div>
           )}
@@ -357,11 +458,25 @@ export default function AdminPage() {
           {/* System Cleanup Tab */}
           {activeTab === 'cleanup' && user.role === 'SUPERADMIN' && <SystemCleanup />}
 
+          {/* Pending Approvals Tab */}
+          {activeTab === 'approvals' && user.role === 'SUPERADMIN' && <PendingApprovals />}
+
           {/* Transaction History Tab */}
           {activeTab === 'transactions' && user.role === 'SUPERADMIN' && <TransactionHistory />}
           </div>
+
+          {/* Advert Panel Sidebar - Right Side (Desktop only) */}
+          <div className="hidden lg:flex order-2 flex-shrink-0">
+            <AdvertPanel />
+          </div>
+        </div>
+
+        {/* Advert Panel Mobile Floating Button */}
+        <div className="lg:hidden">
+          <AdvertPanel />
         </div>
       </div>
     </div>
   );
 }
+

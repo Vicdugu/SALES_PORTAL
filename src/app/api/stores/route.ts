@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { hashPassword } from '@/lib/auth/hash';
-import { generateVerificationCode, getVerificationCodeExpiry } from '@/lib/auth/verification';
-import { sendVerificationEmail } from '@/lib/email/client';
 import { getTokenFromHeader, verifyToken } from '@/lib/auth/jwt';
 import { runMigrations } from '@/lib/db/migrations';
 
@@ -59,7 +57,9 @@ export async function GET(request: NextRequest) {
         email: true,
         address: true,
         phone: true,
+        currency: true,
         isActive: true,
+        isApproved: true,
         createdAt: true,
         _count: {
           select: {
@@ -91,7 +91,9 @@ export async function GET(request: NextRequest) {
               email: true,
               address: true,
               phone: true,
+              currency: true,
               isActive: true,
+              isApproved: true,
               createdAt: true,
               _count: {
                 select: {
@@ -170,50 +172,65 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate verification code
-    const verificationCode = generateVerificationCode();
-    const verificationCodeExpiry = getVerificationCodeExpiry();
-
-    // Create store and admin user together
-    const store = await prisma.store.create({
-      data: {
-        name,
-        email,
-        address,
-        phone,
-        currency: currency || 'USD',
-        verificationCode,
-        verificationCodeExpiry,
-        // Create the admin user for this store
-        users: {
-          create: {
-            email,
-            name,
-            password: await hashPassword(password),
-            role: 'ADMIN',
-          },
-        },
-      },
-      include: {
-        users: true,
-      },
+    // Also check if a user with this email exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
     });
 
-    // Send verification email with code
-    const emailSent = await sendVerificationEmail(name, email, verificationCode);
-
-    if (!emailSent) {
-      console.warn(`Failed to send verification email to ${email}`);
+    if (existingUser) {
+      return NextResponse.json(
+        errorResponse('CONFLICT', 'Email is already registered'),
+        { status: 409 }
+      );
     }
 
-    return NextResponse.json(
-      successResponse({
-        ...store,
-        message: 'Store created successfully! Please check your email for your verification code.',
-        emailSent,
-      }),
-      { status: 201 }
-    );
+    // Create store and admin user together (email auto-verified)
+    try {
+      const store = await prisma.store.create({
+        data: {
+          name,
+          email,
+          address,
+          phone,
+          currency: currency || 'USD',
+          emailVerified: true, // Auto-verify on creation
+          isApproved: false, // Requires superadmin approval
+          // Create the admin user for this store
+          users: {
+            create: {
+              email,
+              name,
+              password: await hashPassword(password),
+              role: 'ADMIN',
+            },
+          },
+        },
+        include: {
+          users: true,
+        },
+      });
+
+      return NextResponse.json(
+        successResponse({
+          ...store,
+          message: 'Store created successfully! Your store is pending approval from a superadmin.',
+        }),
+        { status: 201 }
+      );
+    } catch (createError: any) {
+      console.error('Error creating store:', createError);
+      
+      // Handle unique constraint violations more gracefully
+      if (createError.code === 'P2002') {
+        const field = createError.meta?.target?.[0] || 'email';
+        return NextResponse.json(
+          errorResponse('CONFLICT', `A record with this ${field} already exists. Please use a different ${field}.`),
+          { status: 409 }
+        );
+      }
+      
+      throw createError;
+    }
   } catch (error) {
     console.error('Error creating store:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to create store';

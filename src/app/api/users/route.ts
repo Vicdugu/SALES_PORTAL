@@ -34,11 +34,12 @@ export async function GET(request: NextRequest) {
     console.log('userRole:', userRole);
     console.log('Host:', request.headers.get('host'));
     
-    // For superadmins, check for explicit storeId parameter
-    if (userRole === 'SUPERADMIN' && !storeId) {
+    // For superadmins, ALWAYS prefer explicit storeId parameter
+    if (userRole === 'SUPERADMIN') {
       const storeIdParam = request.nextUrl.searchParams.get('storeId');
       if (storeIdParam) {
         storeId = storeIdParam;
+        console.log('[GET /users] SuperAdmin querying staff for storeId:', storeId);
       }
     }
 
@@ -75,6 +76,8 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
+    console.log('[GET /users] Fetching staff for store:', { storeId, count: users.length, users });
+
     return NextResponse.json(successResponse(users));
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -94,19 +97,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, email, password, role, storeId: bodyStoreId } = body;
 
-    // For superadmins, allow storeId to be passed in the request body
-    if (bodyStoreId && !storeId) {
+    // For superadmins, ALWAYS prefer bodyStoreId when provided
+    let userRole = 'STAFF';
+    if (bodyStoreId) {
       // Verify the user is a superadmin by checking JWT token
       const authHeader = request.headers.get('authorization');
       if (authHeader) {
         const token = authHeader.replace('Bearer ', '');
         try {
           const verified = await jwtVerify(token, JWT_SECRET);
+          userRole = verified.payload.role as string;
           // Only superadmins can specify storeId in request body
           if (verified.payload.role === 'SUPERADMIN') {
             storeId = bodyStoreId;
+            console.log('[POST /users] SuperAdmin creating staff for storeId:', storeId);
           }
         } catch (e) {
+          console.log('[POST /users] JWT verification failed:', e);
           // JWT verification failed, storeId will remain null and fail below
         }
       }

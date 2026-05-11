@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiCall } from '@/lib/api/client';
+import { getCurrencyName } from '@/lib/utils/currency';
 
 interface BrandingData {
   backgroundImage?: string;
@@ -11,10 +12,15 @@ interface BrandingData {
   accentColor: string;
 }
 
+const SUPPORTED_CURRENCIES = [
+  'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY', 'INR', 'MXN', 'ZAR', 'NGN', 'GHS', 'KES', 'EGP'
+];
+
 export function BrandingSettings() {
   const { store, updateStore } = useAuth();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(store?.currency || 'USD');
   const [branding, setBranding] = useState<BrandingData>({
     backgroundImage: store?.backgroundImage,
     primaryColor: store?.primaryColor || '#000000',
@@ -91,6 +97,41 @@ export function BrandingSettings() {
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to save branding settings' });
       console.error('Save error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCurrencyChange = async (newCurrency: string) => {
+    try {
+      setSelectedCurrency(newCurrency);
+      setLoading(true);
+      const response = await apiCall('/api/stores/currency', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency: newCurrency }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          // Update the store context with the new currency
+          updateStore({
+            currency: data.data.currency,
+          });
+          setMessage({ type: 'success', text: `Currency changed to ${getCurrencyName(newCurrency)} successfully!` });
+        }
+      } else {
+        const data = await response.json();
+        setMessage({ type: 'error', text: data.error?.message || 'Failed to update currency' });
+        // Revert currency selection on error
+        setSelectedCurrency(store?.currency || 'USD');
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to update currency' });
+      console.error('Currency change error:', error);
+      // Revert currency selection on error
+      setSelectedCurrency(store?.currency || 'USD');
     } finally {
       setLoading(false);
     }
@@ -295,6 +336,37 @@ export function BrandingSettings() {
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Currency Settings */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <span>💱</span> Store Currency
+        </h3>
+        <p className="text-gray-600 text-sm mb-6">
+          Select the currency for all transactions, prices, and reports. Changes apply instantly across the entire system.
+        </p>
+
+        <div className="max-w-md">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Currency
+          </label>
+          <select
+            value={selectedCurrency}
+            onChange={(e) => handleCurrencyChange(e.target.value)}
+            disabled={loading}
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg font-medium text-gray-950 focus:outline-none focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition"
+          >
+            {SUPPORTED_CURRENCIES.map((curr) => (
+              <option key={curr} value={curr}>
+                {curr} - {getCurrencyName(curr)}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-2">
+            Current: <span className="font-semibold">{selectedCurrency} - {getCurrencyName(selectedCurrency)}</span>
+          </p>
         </div>
       </div>
 
