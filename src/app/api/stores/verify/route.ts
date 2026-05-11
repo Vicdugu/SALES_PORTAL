@@ -20,7 +20,7 @@ function getClientIp(request: NextRequest): string | undefined {
  */
 export async function GET(request: NextRequest) {
   try {
-    await runMigrations(prisma);
+    await runMigrations();
 
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
 
   try {
-    await runMigrations(prisma);
+    await runMigrations();
 
     const body = await request.json();
     const { token, email } = body;

@@ -11,7 +11,7 @@ import { runMigrations } from '@/lib/db/migrations';
  */
 export async function POST(request: NextRequest) {
   try {
-    await runMigrations(prisma);
+    await runMigrations();
 
     const body = await request.json();
     const { email } = body;
