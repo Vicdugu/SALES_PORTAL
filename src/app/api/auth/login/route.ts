@@ -30,6 +30,11 @@ export async function POST(request: NextRequest) {
       throw new UnauthorizedError('Invalid credentials');
     }
 
+    // Check if store is approved for non-superadmin users
+    if (user.role !== 'SUPERADMIN' && user.store && !user.store.isApproved) {
+      throw new UnauthorizedError('Your store is pending approval. Please wait for superadmin approval.');
+    }
+
     // Verify password
     const isPasswordValid = await verifyPassword(password, user.password);
     if (!isPasswordValid) {

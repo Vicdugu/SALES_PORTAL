@@ -8,12 +8,13 @@ import { apiCall } from '@/lib/api/client';
 import { ProductGrid } from '@/components/till/ProductGrid';
 import { CartSummary } from '@/components/till/CartSummary';
 import { PaymentOptions, PaymentMethod } from '@/components/till/PaymentOptions';
+import { PaymentMethodSelection } from '@/components/till/PaymentMethodSelection';
 import { CompletedTransactions } from '@/components/till/CompletedTransactions';
 import { ReadyOrders } from '@/components/till/ReadyOrders';
+import { AdvertPanel } from '@/components/AdvertPanel';
 import { StoreCurrencyBadge } from '@/components/StoreCurrencyBadge';
 import { BrandingHeader } from '@/components/BrandingHeader';
 import { getCurrencySymbol } from '@/lib/utils/currency';
-import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
 
 type TabType = 'pos' | 'ready' | 'transactions';
 
@@ -35,11 +36,10 @@ export default function TillPage() {
   const router = useRouter();
   const { items, addItem, subtotal, tax, total, clearCart } = useOrderStore();
 
-  // Listen for real-time branding updates and refresh when changes occur
-  useBrandingUpdates();
-
   const [activeTab, setActiveTab] = useState<TabType>('pos');
+  const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [splitPaymentMode, setSplitPaymentMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -133,7 +133,7 @@ export default function TillPage() {
   };
 
   const handleCheckout = () => {
-    setShowPayment(true);
+    setShowPaymentMethodSelection(true);
   };
 
   const handlePaymentSelected = async (method: PaymentMethod) => {
@@ -148,107 +148,112 @@ export default function TillPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Branding Header */}
-      <div className="px-4 pt-4">
-        <BrandingHeader />
-      </div>
+    <div className="h-screen flex flex-col md:flex-row bg-gray-50">
+      {/* Main Content */}
+      <div className="order-1 flex flex-col flex-1 overflow-y-auto min-h-0">
+        {/* Branding Header */}
+        <div className="px-2 sm:px-4 pt-2 sm:pt-4 flex-shrink-0">
+          <BrandingHeader />
+        </div>
 
-      {/* Header */}
-      <div className="bg-white border-b p-4 shadow">
-        <div className="max-w-full flex justify-between items-center mb-4">
-          <div>
-            <p className="text-gray-600 text-sm">Cashier: {user.name}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="bg-green-50 border border-green-300 rounded px-4 py-2 text-center">
-              <p className="text-xs text-green-700 font-semibold">Today's Completed</p>
-              <p className="text-2xl font-bold text-green-600">{dailyCompletedCount}</p>
+        {/* Header */}
+        <div className="bg-white border-b-2 border-gray-300 p-2 sm:p-4 shadow flex-shrink-0">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-between items-start sm:items-center mb-3 sm:mb-4">
+            <div className="min-w-0">
+              <p className="text-gray-900 text-xs sm:text-sm truncate font-semibold">Cashier: {user.name}</p>
             </div>
-            <StoreCurrencyBadge />
+            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+              <div className="bg-green-100 border-2 border-green-600 rounded px-2 sm:px-4 py-2 text-center flex-shrink-0">
+                <p className="text-xs text-green-900 font-bold">Today's Completed</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-700">{dailyCompletedCount}</p>
+              </div>
+              <StoreCurrencyBadge />
+              <button
+                onClick={() => router.push('/')}
+                className="px-2 sm:px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-xs sm:text-sm font-bold active:scale-95 transition-transform border border-gray-700"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex gap-1 sm:gap-2 border-t-2 border-gray-300 pt-2 sm:pt-3 overflow-x-auto">
             <button
-              onClick={() => router.push('/')}
-              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              onClick={() => handleTabChange('pos')}
+              style={{
+                backgroundColor: activeTab === 'pos' ? primaryColor : '#D1D5DB',
+                color: activeTab === 'pos' ? '#FFFFFF' : '#1F2937',
+                borderColor: activeTab === 'pos' ? primaryColor : '#9CA3AF',
+              }}
+              className="px-2 sm:px-4 py-1.5 sm:py-2 rounded font-bold transition-colors duration-150 hover:opacity-90 active:scale-95 will-change-colors text-xs sm:text-base whitespace-nowrap flex-shrink-0 border border-current"
             >
-              Back
+              🛒 POS
+            </button>
+            <button
+              onClick={() => handleTabChange('ready')}
+              style={{
+                backgroundColor: activeTab === 'ready' ? primaryColor : '#D1D5DB',
+                color: activeTab === 'ready' ? '#FFFFFF' : '#1F2937',
+                borderColor: activeTab === 'ready' ? primaryColor : '#9CA3AF',
+              }}
+              className="px-2 sm:px-4 py-1.5 sm:py-2 rounded font-bold transition-colors duration-150 hover:opacity-90 active:scale-95 will-change-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-base whitespace-nowrap flex-shrink-0 border border-current"
+            >
+              <span>🟢 Ready</span>
+              {readyOrdersCount > 0 && (
+                <span className="bg-red-700 text-white text-xs font-bold rounded-full px-1.5 sm:px-2 py-0.5 sm:py-1 border border-red-900">
+                  {readyOrdersCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => handleTabChange('transactions')}
+              style={{
+                backgroundColor: activeTab === 'transactions' ? primaryColor : '#D1D5DB',
+                color: activeTab === 'transactions' ? '#FFFFFF' : '#1F2937',
+                borderColor: activeTab === 'transactions' ? primaryColor : '#9CA3AF',
+              }}
+              className="px-2 sm:px-4 py-1.5 sm:py-2 rounded font-bold transition-colors duration-150 hover:opacity-90 active:scale-95 will-change-colors text-xs sm:text-base whitespace-nowrap flex-shrink-0 border border-current"
+            >
+              📋 Transactions
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex gap-2 border-t pt-3">
-          <button
-            onClick={() => handleTabChange('pos')}
-            style={{
-              backgroundColor: activeTab === 'pos' ? primaryColor : '#E5E7EB',
-              color: activeTab === 'pos' ? '#FFFFFF' : '#374151',
-            }}
-            className="px-4 py-2 rounded font-semibold transition-colors duration-150 hover:opacity-90 will-change-colors"
-          >
-            🛒 Point of Sale
-          </button>
-          <button
-            onClick={() => handleTabChange('ready')}
-            style={{
-              backgroundColor: activeTab === 'ready' ? primaryColor : '#E5E7EB',
-              color: activeTab === 'ready' ? '#FFFFFF' : '#374151',
-            }}
-            className="px-4 py-2 rounded font-semibold transition-colors duration-150 hover:opacity-90 will-change-colors flex items-center gap-2"
-          >
-            <span>🟢 Ready for Collection</span>
-            {readyOrdersCount > 0 && (
-              <span className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-1 ml-1">
-                {readyOrdersCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleTabChange('transactions')}
-            style={{
-              backgroundColor: activeTab === 'transactions' ? primaryColor : '#E5E7EB',
-              color: activeTab === 'transactions' ? '#FFFFFF' : '#374151',
-            }}
-            className="px-4 py-2 rounded font-semibold transition-colors duration-150 hover:opacity-90 will-change-colors"
-          >
-            📋 Completed Transactions
-          </button>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col lg:flex-row md:overflow-hidden overflow-y-auto gap-2 sm:gap-4 p-2 sm:p-4 min-h-0">
+          {activeTab === 'pos' ? (
+            <>
+              {/* Product Grid */}
+              <ProductGrid onAddItem={handleAddItem} refreshTrigger={refreshCount} />
+
+              {/* Cart Summary */}
+              <CartSummary onCheckout={handleCheckout} />
+            </>
+          ) : activeTab === 'ready' ? (
+            <>
+              {/* Ready Orders */}
+              <div className="flex-1 min-h-0">
+                <ReadyOrders
+                  isActive={activeTab === 'ready'}
+                  onOrderCompleted={() => setRefreshCount((prev) => prev + 1)}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Completed Transactions */}
+              <div className="flex-1 min-h-0">
+                <CompletedTransactions isActive={activeTab === 'transactions'} />
+              </div>
+            </>
+          )}
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden gap-4 p-4">
-        {activeTab === 'pos' ? (
-          <>
-            {/* Product Grid */}
-            <ProductGrid onAddItem={handleAddItem} refreshTrigger={refreshCount} />
-
-            {/* Cart Summary */}
-            <CartSummary onCheckout={handleCheckout} />
-          </>
-        ) : activeTab === 'ready' ? (
-          <>
-            {/* Ready Orders */}
-            <div className="flex-1">
-              <ReadyOrders
-                isActive={activeTab === 'ready'}
-                onOrderCompleted={() => setRefreshCount((prev) => prev + 1)}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Completed Transactions */}
-            <div className="flex-1">
-              <CompletedTransactions isActive={activeTab === 'transactions'} />
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded shadow-lg max-w-sm">
-          <div>{error}</div>
+        {/* Error Message */}
+        {error && (
+          <div className="fixed bottom-4 right-4 bg-red-500 text-white px-4 sm:px-6 py-3 rounded shadow-lg max-w-sm text-sm z-20">
+            <div>{error}</div>
           <button
             onClick={() => setError(null)}
             className="ml-4 font-bold hover:underline"
@@ -271,6 +276,26 @@ export default function TillPage() {
         </div>
       )}
 
+      {/* Payment Method Selection Modal */}
+      {showPaymentMethodSelection && (
+        <PaymentMethodSelection
+          total={total}
+          onSelectSinglePayment={() => {
+            setSplitPaymentMode(false);
+            setShowPaymentMethodSelection(false);
+            setShowPayment(true);
+          }}
+          onSelectSplitPayment={() => {
+            setSplitPaymentMode(true);
+            setShowPaymentMethodSelection(false);
+            setShowPayment(true);
+          }}
+          onCancel={() => {
+            setShowPaymentMethodSelection(false);
+          }}
+        />
+      )}
+
       {/* Payment Modal */}
       {showPayment && (
         <PaymentOptions
@@ -278,8 +303,10 @@ export default function TillPage() {
           onPaymentSelected={handlePaymentSelected}
           onCancel={() => {
             setShowPayment(false);
+            setShowPaymentMethodSelection(false);
             setError(null);
           }}
+          splitPayment={splitPaymentMode}
         />
       )}
 
@@ -293,5 +320,16 @@ export default function TillPage() {
         </div>
       )}
     </div>
+
+    {/* Advert Panel Sidebar - Right Side (Desktop only) */}
+    <div className="hidden md:flex order-2 flex-shrink-0">
+      <AdvertPanel />
+    </div>
+
+    {/* Advert Panel Mobile Floating Button */}
+    <div className="md:hidden">
+      <AdvertPanel />
+    </div>
+  </div>
   );
 }

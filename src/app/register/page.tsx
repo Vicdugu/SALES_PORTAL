@@ -42,6 +42,18 @@ export default function RegisterStorePage() {
       return;
     }
 
+    if (!formData.address || !formData.address.trim()) {
+      setError('Address is required');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.phone || !formData.phone.trim()) {
+      setError('Phone number is required');
+      setLoading(false);
+      return;
+    }
+
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
       setLoading(false);
@@ -50,6 +62,12 @@ export default function RegisterStorePage() {
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.email.includes('@')) {
+      setError('Please enter a valid email address');
       setLoading(false);
       return;
     }
@@ -74,13 +92,13 @@ export default function RegisterStorePage() {
         throw new Error(data.error?.message || data.error || 'Failed to create store');
       }
 
-      // Redirect to verification code page
+      // Redirect to login page
       setTimeout(() => {
-        router.push(`/verify-code?email=${encodeURIComponent(formData.email)}`);
-      }, 1000);
+        router.push('/login');
+      }, 2000);
 
       setSuccess(
-        `Store created successfully! 🎉\n\nA verification code has been sent to ${formData.email}.\n\nRedirecting to verification page...`
+        `Store created successfully! 🎉\n\nYour store is pending approval from a superadmin.\nYou will receive an email once approved.\n\nRedirecting to login page...`
       );
     } catch (err: any) {
       const errorMessage = 
@@ -209,7 +227,7 @@ export default function RegisterStorePage() {
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address
+              Address *
             </label>
             <input
               type="text"
@@ -217,13 +235,14 @@ export default function RegisterStorePage() {
               value={formData.address}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+              required
               disabled={loading}
             />
           </div>
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone
+              Phone *
             </label>
             <input
               type="tel"
@@ -231,6 +250,7 @@ export default function RegisterStorePage() {
               value={formData.phone}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+              required
               disabled={loading}
             />
           </div>

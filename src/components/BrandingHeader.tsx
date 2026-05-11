@@ -31,6 +31,16 @@ export function BrandingHeader() {
         <div
           className="absolute inset-0"
           style={{
+            background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.25) 100%)',
+          }}
+        ></div>
+      )}
+
+      {/* Fallback overlay for light brand colors */}
+      {!backgroundImage && (
+        <div
+          className="absolute inset-0"
+          style={{
             background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.1) 100%)',
           }}
         ></div>
@@ -41,20 +51,19 @@ export function BrandingHeader() {
         {/* Store Initial and Store Name */}
         <div className="flex items-center gap-6">
           <div
-            className="w-24 h-24 rounded-xl shadow-xl flex items-center justify-center text-white text-4xl font-bold flex-shrink-0 border-2"
+            className="w-24 h-24 rounded-xl shadow-xl flex items-center justify-center text-white text-4xl font-bold flex-shrink-0 border-4 border-white/80"
             style={{ 
               backgroundColor: primaryColor,
-              borderColor: 'rgba(255, 255, 255, 0.5)'
             }}
           >
             {store.name.charAt(0).toUpperCase()}
           </div>
 
           <div>
-            <h1 className="text-3xl font-bold text-white drop-shadow-md">
+            <h1 className="text-3xl font-bold text-white drop-shadow-lg" style={{textShadow: '0 2px 8px rgba(0,0,0,0.5)'}}>
               {store.name}
             </h1>
-            <p className="text-base text-white drop-shadow-sm opacity-90">
+            <p className="text-base text-white drop-shadow-lg font-semibold" style={{textShadow: '0 1px 4px rgba(0,0,0,0.4)'}}>
               {user?.name && `Welcome, ${user.name}`}
             </p>
           </div>
@@ -68,7 +77,7 @@ export function BrandingHeader() {
               borderColor: 'rgba(255, 255, 255, 0.9)',
             }}>
             <span className="text-white text-sm font-bold tracking-wide drop-shadow-md">
-              📍 {store.id.slice(0, 8)}...
+              📍 {store.id.slice(0, 8)}
             </span>
           </div>
         )}

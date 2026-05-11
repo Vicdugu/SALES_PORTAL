@@ -78,11 +78,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { staffId, items, notes, paymentMethod } = body;
+    const { staffId, items, notes, paymentMethod, payments } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json(
         errorResponse('VALIDATION_ERROR', 'Items are required'),
+        { status: 400 }
+      );
+    }
+
+    // Validate payment data
+    if (!payments && !paymentMethod) {
+      return NextResponse.json(
+        errorResponse('VALIDATION_ERROR', 'Payment method is required'),
         { status: 400 }
       );
     }
@@ -95,6 +103,24 @@ export async function POST(request: NextRequest) {
     const tax = 0; // No tax
     const total = subtotal;
 
+    // Validate split payments if provided
+    if (payments && Array.isArray(payments)) {
+      if (payments.length > 2) {
+        return NextResponse.json(
+          errorResponse('VALIDATION_ERROR', 'Maximum 2 payment methods per order'),
+          { status: 400 }
+        );
+      }
+
+      const totalPaid = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      if (Math.abs(totalPaid - total) > 0.01) {
+        return NextResponse.json(
+          errorResponse('VALIDATION_ERROR', `Payment total (${totalPaid.toFixed(2)}) does not match order total (${total.toFixed(2)})`),
+          { status: 400 }
+        );
+      }
+    }
+
     // Generate order number
     const orderNumber = `ORD-${Date.now()}`;
 
@@ -103,6 +129,7 @@ export async function POST(request: NextRequest) {
       staffId: userId,
       itemsCount: items.length,
       paymentMethod,
+      paymentCount: payments?.length || 1,
     });
 
     // Verify store exists - do NOT auto-create
@@ -163,10 +190,21 @@ export async function POST(request: NextRequest) {
         tax,
         total,
         notes,
-        paymentMethod,
+        paymentMethod: paymentMethod || (payments?.[0]?.method),
+        // Create payment records for split payments
+        payments: payments && Array.isArray(payments) ? {
+          createMany: {
+            data: payments.map((p: any, index: number) => ({
+              paymentMethod: p.method,
+              amount: p.amount,
+              sequence: index + 1,
+            })),
+          },
+        } : undefined,
       },
       include: {
         items: true,
+        payments: true,
         staff: {
           select: {
             id: true,

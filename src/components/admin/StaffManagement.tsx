@@ -100,7 +100,9 @@ export function StaffManagement() {
         return;
       }
       
-      const response = await apiCall('/api/users');
+      // For non-superadmin users, include storeId as query parameter
+      const url = storedStoreId ? `/api/users?storeId=${storedStoreId}` : '/api/users';
+      const response = await apiCall(url);
       if (response.ok) {
         const data = await response.json();
         console.log('[StaffManagement] Staff fetched successfully', { count: data.data?.length });
@@ -125,19 +127,28 @@ export function StaffManagement() {
       setError(null);
       setLoading(true);
       setStaff([]); // Clear staff before fetching
+      
+      console.log('[StaffManagement] fetchStaffForStore called with storeId:', storeId);
+      
       const response = await apiCall(`/api/users?storeId=${storeId}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('[StaffManagement] Staff fetched successfully for store', storeId, {
+          rawResponse: data,
+          staffCount: data.data?.length,
+          staff: data.data,
+        });
         setStaff(data.data || []);
       } else {
         const errorData = await response.json();
+        console.error('[StaffManagement] API error fetching staff for store', storeId, errorData);
         setError(errorData.error?.message || 'Failed to load staff for this store');
         setStaff([]); // Ensure staff is cleared on error
       }
     } catch (err) {
+      console.error('[StaffManagement] Error fetching staff for store:', err);
       setError('Error fetching staff');
       setStaff([]); // Ensure staff is cleared on error
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -196,6 +207,8 @@ export function StaffManagement() {
         requestBody.storeId = selectedStore;
       }
 
+      console.log('[StaffManagement] Creating staff with request body:', requestBody);
+
       const response = await apiCall('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,8 +221,20 @@ export function StaffManagement() {
       }
 
       const newUser = await response.json();
-      setStaff((prev) => [newUser.data, ...prev]);
-      setSuccessMessage(`✓ Staff created successfully!\n\nName: ${formData.name}\nEmail: ${formData.email}\nRole: ${formData.role}`);
+      
+      console.log('[StaffManagement] Staff created successfully:', newUser);
+      
+      const storeName = stores.find(s => s.id === selectedStore)?.name || 'Store';
+      
+      setSuccessMessage(
+        `✅ Staff Account Created Successfully!\n\n` +
+        `Name: ${formData.name}\n` +
+        `Email: ${formData.email}\n` +
+        `Password: ${formData.password}\n` +
+        `Role: ${formData.role}\n` +
+        `Store: ${storeName}\n\n` +
+        `⏱️ The staff member can log in immediately using these credentials.`
+      );
       
       // Reset form
       setFormData({
@@ -221,9 +246,19 @@ export function StaffManagement() {
       });
       setShowForm(false);
 
-      // Clear success message after 5 seconds
-      setTimeout(() => setSuccessMessage(null), 5000);
+      // Refresh staff list to ensure new staff appears
+      if (user?.role === 'SUPERADMIN' && selectedStore) {
+        console.log('[StaffManagement] Refreshing staff list for superadmin store:', selectedStore);
+        setTimeout(() => fetchStaffForStore(selectedStore), 500);
+      } else {
+        console.log('[StaffManagement] Refreshing staff list for store admin');
+        setTimeout(() => fetchStaff(), 500);
+      }
+
+      // Clear success message after 7 seconds (longer for reading credentials)
+      setTimeout(() => setSuccessMessage(null), 7000);
     } catch (err) {
+      console.error('[StaffManagement] Error creating staff:', err);
       setError(err instanceof Error ? err.message : 'Failed to create staff');
     } finally {
       setSubmitting(false);

@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     // Setup SSE response
     const encoder = new TextEncoder();
     let controller: ReadableStreamDefaultController;
+    let isStreamClosed = false;
 
     const stream = new ReadableStream({
       start(ctrl) {
@@ -31,25 +32,46 @@ export async function GET(request: NextRequest) {
         const connectionKey = `branding-${storeId}-${Date.now()}-${Math.random()}`;
         activeConnections.set(connectionKey, controller);
 
+        console.log('[Branding SSE] Client connected for store:', storeId);
+
         // Send initial connection message
-        const initMessage = `data: ${JSON.stringify({ type: 'connected' })}\n\n`;
-        controller.enqueue(encoder.encode(initMessage));
+        try {
+          const initMessage = `data: ${JSON.stringify({ type: 'connected' })}\n\n`;
+          controller.enqueue(encoder.encode(initMessage));
+        } catch (err) {
+          console.error('[Branding SSE] Error sending initial message:', err);
+          isStreamClosed = true;
+          return;
+        }
 
         // Subscribe to branding events for this store
         const unsubscribe = brandingBroadcaster.subscribe(storeId, (event: BrandingEvent) => {
-          const message = `event: branding\ndata: ${JSON.stringify(event)}\n\n`;
+          if (isStreamClosed) {
+            console.log('[Branding SSE] Stream closed, skipping event');
+            return;
+          }
+
           try {
+            const message = `event: branding\ndata: ${JSON.stringify(event)}\n\n`;
             controller.enqueue(encoder.encode(message));
+            console.log('[Branding SSE] Event sent for store:', storeId);
           } catch (err) {
-            console.error('Error sending branding event:', err);
+            console.error('[Branding SSE] Error sending branding event:', err);
+            isStreamClosed = true;
           }
         });
 
         // Cleanup on close
         return () => {
+          console.log('[Branding SSE] Stream cleanup for store:', storeId);
+          isStreamClosed = true;
           unsubscribe();
           activeConnections.delete(connectionKey);
         };
+      },
+      cancel() {
+        console.log('[Branding SSE] Stream cancelled');
+        isStreamClosed = true;
       },
     });
 
@@ -62,7 +84,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error setting up branding subscription:', error);
+    console.error('[Branding SSE] Error setting up branding subscription:', error);
     return NextResponse.json(
       { error: 'Failed to setup subscription' },
       { status: 500 }
