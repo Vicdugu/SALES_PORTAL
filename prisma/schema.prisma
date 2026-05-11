@@ -29,6 +29,7 @@ model Store {
   
   // Status
   isActive  Boolean  @default(true)
+  isApproved Boolean @default(false)
   emailVerified Boolean @default(false)
   verificationCode String?
   verificationCodeExpiry DateTime?
@@ -42,6 +43,7 @@ model Store {
   staff     StaffMember[]
   notifications Notification[]
   auditLogs AuditLog[]
+  adverts   Advert[]
   
   @@index([email])
 }
@@ -105,12 +107,13 @@ model Order {
   status    OrderStatus @default(PENDING)
   
   items     OrderItem[]
+  payments  PaymentRecord[] // Support for split payments (up to 2)
   
   subtotal  Float    @default(0)
   tax       Float    @default(0)
   total     Float    @default(0)
   
-  paymentMethod String?
+  paymentMethod String? // Kept for backward compatibility
   notes     String?
   
   createdAt DateTime @default(now())
@@ -121,6 +124,21 @@ model Order {
   @@index([staffId])
   @@index([status])
   @@index([createdAt])
+}
+
+model PaymentRecord {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  paymentMethod String // CASH, TRANSFER, POS
+  amount    Float
+  sequence  Int      // 1 for first payment, 2 for second (max 2 payments per order)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([orderId, sequence]) // Max 2 payments per order
+  @@index([orderId])
 }
 
 enum OrderStatus {
@@ -155,8 +173,8 @@ model InventoryItem {
   category  String   // e.g., "Food", "Drink", "Dessert"
   unitPrice Float    // Price for POS system
   quantity  Int      // Available quantity for POS
-  unit      String   // e.g., "kg", "liters", "pieces"
-  currentStock Float
+  unit      String   @default("pieces") // e.g., "kg", "liters", "pieces"
+  currentStock Float @default(0)
   minimumStock Float @default(10)
   
   lastRestocked DateTime?
@@ -232,5 +250,29 @@ model AuditLog {
   @@index([storeId])
   @@index([userId])
   @@index([createdAt])
+}
+
+// ===== ADVERTS =====
+model Advert {
+  id        String   @id @default(cuid())
+  
+  title     String
+  description String?
+  imageUrl  String
+  link      String?           // Optional clickable link
+  caption   String?           // Text label/CTA
+  
+  storeId   String?           // Null = universal advert visible to all stores
+  store     Store?    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)  // Display order in panel
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([storeId])
+  @@index([isActive])
+  @@index([order])
 }
 

@@ -76,16 +76,16 @@ export function ProductGrid({ onAddItem, refreshTrigger }: ProductGridProps) {
   return (
     <div className="flex-1 flex flex-col">
       {/* Category Filter */}
-      <div className="p-4 border-b">
+      <div className="p-2 sm:p-4 border-b">
         <div className="flex gap-2 overflow-x-auto pb-2">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded whitespace-nowrap font-medium transition ${
+              className={`px-3 sm:px-4 py-2 rounded whitespace-nowrap font-bold text-xs sm:text-sm transition border ${
                 selectedCategory === cat
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  ? 'bg-blue-700 text-white border-blue-800'
+                  : 'bg-gray-300 text-gray-900 hover:bg-gray-400 border-gray-400'
               }`}
             >
               {cat}
@@ -95,29 +95,31 @@ export function ProductGrid({ onAddItem, refreshTrigger }: ProductGridProps) {
       </div>
 
       {/* Product Grid */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
           {filteredProducts.map((product) => (
             <div
               key={product.id}
-              className="border rounded-lg p-4 bg-white hover:shadow-lg transition cursor-pointer"
+              className="border-2 border-gray-300 rounded-lg p-2 sm:p-3 bg-white hover:shadow-lg transition cursor-pointer active:scale-95 min-h-32 sm:min-h-40 flex flex-col justify-between"
               onClick={() => {
                 if (product.quantity > 0) {
                   setSelectedItem(product);
                 }
               }}
             >
-              <h3 className="font-semibold text-sm mb-2">{product.name}</h3>
-              <p className="text-gray-600 text-xs mb-2">{product.category}</p>
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-green-600">
+              <div>
+                <h3 className="font-bold text-sm sm:text-base mb-1 text-gray-950 line-clamp-2">{product.name}</h3>
+                <p className="text-gray-700 font-semibold text-xs sm:text-sm mb-2">{product.category}</p>
+              </div>
+              <div className="flex justify-between items-center gap-2 flex-wrap">
+                <span className="text-base sm:text-lg font-bold text-green-800">
                   {currencySymbol}{product.unitPrice.toFixed(2)}
                 </span>
                 <span
-                  className={`text-xs px-2 py-1 rounded ${
+                  className={`text-xs sm:text-sm px-2 py-1 rounded font-bold border ${
                     product.quantity > 0
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
+                      ? 'bg-green-200 text-green-900 border-green-700'
+                      : 'bg-red-200 text-red-900 border-red-700'
                   }`}
                 >
                   {product.quantity > 0 ? 'In Stock' : 'Out'}
