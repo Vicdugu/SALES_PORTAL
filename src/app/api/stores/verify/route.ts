@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/client';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { hashToken, isTokenExpired } from '@/lib/auth/verification-token';
 import { checkVerificationRateLimit, logVerificationAttempt } from '@/lib/auth/rate-limit';
+import { runMigrations } from '@/lib/db/migrations';
 
 function getClientIp(request: NextRequest): string | undefined {
   return (
@@ -19,6 +20,8 @@ function getClientIp(request: NextRequest): string | undefined {
  */
 export async function GET(request: NextRequest) {
   try {
+    await runMigrations(prisma);
+
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
     const email = searchParams.get('email');
@@ -69,6 +72,8 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
 
   try {
+    await runMigrations(prisma);
+
     const body = await request.json();
     const { token, email } = body;
 

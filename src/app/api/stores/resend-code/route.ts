@@ -4,12 +4,15 @@ import { errorResponse, successResponse } from '@/lib/utils/response';
 import { generateVerificationToken } from '@/lib/auth/verification-token';
 import { checkVerificationRateLimit, logVerificationAttempt } from '@/lib/auth/rate-limit';
 import { sendVerificationLinkEmail } from '@/lib/email/client';
+import { runMigrations } from '@/lib/db/migrations';
 
 /**
  * POST /api/stores/resend-code - Resend a new verification link
  */
 export async function POST(request: NextRequest) {
   try {
+    await runMigrations(prisma);
+
     const body = await request.json();
     const { email } = body;
 
