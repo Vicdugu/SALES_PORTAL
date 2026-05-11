@@ -30,8 +30,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files - secrets never committed
+.env
+.env.local
+.env.production
+.env.production.local
+.env.development.local
+.env.test.local
+.env.prod
+
+# .env.example IS committed (no secrets, just template)
 
 # vercel
 .vercel
@@ -39,9 +47,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-.vercel
-.env*.local
 
 # temp files
 temp_lines.txt
