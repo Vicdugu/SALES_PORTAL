@@ -200,49 +200,69 @@ async function getMigrationSQL(): Promise<string> {
     );
 
     -- CreateIndex
-    CREATE UNIQUE INDEX "Store_email_key" ON "Store"("email");
-    CREATE INDEX "Store_email_idx" ON "Store"("email");
-    CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
-    CREATE INDEX "User_storeId_idx" ON "User"("storeId");
-    CREATE UNIQUE INDEX "StaffMember_userId_storeId_key" ON "StaffMember"("userId", "storeId");
-    CREATE INDEX "StaffMember_storeId_idx" ON "StaffMember"("storeId");
-    CREATE INDEX "Order_storeId_idx" ON "Order"("storeId");
-    CREATE INDEX "Order_staffId_idx" ON "Order"("staffId");
-    CREATE INDEX "Order_status_idx" ON "Order"("status");
-    CREATE INDEX "Order_createdAt_idx" ON "Order"("createdAt");
-    CREATE INDEX "OrderItem_orderId_idx" ON "OrderItem"("orderId");
-    CREATE UNIQUE INDEX "InventoryItem_name_storeId_key" ON "InventoryItem"("name", "storeId");
-    CREATE INDEX "InventoryItem_storeId_idx" ON "InventoryItem"("storeId");
-    CREATE INDEX "InventoryItem_category_idx" ON "InventoryItem"("category");
-    CREATE INDEX "InventoryUsage_itemId_idx" ON "InventoryUsage"("itemId");
-    CREATE INDEX "Notification_storeId_idx" ON "Notification"("storeId");
-    CREATE INDEX "Notification_isRead_idx" ON "Notification"("isRead");
-    CREATE INDEX "AuditLog_storeId_idx" ON "AuditLog"("storeId");
-    CREATE INDEX "AuditLog_userId_idx" ON "AuditLog"("userId");
-    CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
-    CREATE INDEX "Transaction_storeId_idx" ON "Transaction"("storeId");
+    CREATE UNIQUE INDEX IF NOT EXISTS "Store_email_key" ON "Store"("email");
+    CREATE INDEX IF NOT EXISTS "Store_email_idx" ON "Store"("email");
+    CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
+    CREATE INDEX IF NOT EXISTS "User_storeId_idx" ON "User"("storeId");
+    CREATE UNIQUE INDEX IF NOT EXISTS "StaffMember_userId_storeId_key" ON "StaffMember"("userId", "storeId");
+    CREATE INDEX IF NOT EXISTS "StaffMember_storeId_idx" ON "StaffMember"("storeId");
+    CREATE INDEX IF NOT EXISTS "Order_storeId_idx" ON "Order"("storeId");
+    CREATE INDEX IF NOT EXISTS "Order_staffId_idx" ON "Order"("staffId");
+    CREATE INDEX IF NOT EXISTS "Order_status_idx" ON "Order"("status");
+    CREATE INDEX IF NOT EXISTS "Order_createdAt_idx" ON "Order"("createdAt");
+    CREATE INDEX IF NOT EXISTS "OrderItem_orderId_idx" ON "OrderItem"("orderId");
+    CREATE UNIQUE INDEX IF NOT EXISTS "InventoryItem_name_storeId_key" ON "InventoryItem"("name", "storeId");
+    CREATE INDEX IF NOT EXISTS "InventoryItem_storeId_idx" ON "InventoryItem"("storeId");
+    CREATE INDEX IF NOT EXISTS "InventoryItem_category_idx" ON "InventoryItem"("category");
+    CREATE INDEX IF NOT EXISTS "InventoryUsage_itemId_idx" ON "InventoryUsage"("itemId");
+    CREATE INDEX IF NOT EXISTS "Notification_storeId_idx" ON "Notification"("storeId");
+    CREATE INDEX IF NOT EXISTS "Notification_isRead_idx" ON "Notification"("isRead");
+    CREATE INDEX IF NOT EXISTS "AuditLog_storeId_idx" ON "AuditLog"("storeId");
+    CREATE INDEX IF NOT EXISTS "AuditLog_userId_idx" ON "AuditLog"("userId");
+    CREATE INDEX IF NOT EXISTS "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
+    CREATE INDEX IF NOT EXISTS "Transaction_storeId_idx" ON "Transaction"("storeId");
 
     -- AddForeignKey
-    ALTER TABLE "User" ADD CONSTRAINT "User_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "StaffMember" ADD CONSTRAINT "StaffMember_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "Order" ADD CONSTRAINT "Order_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "Order" ADD CONSTRAINT "Order_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-    ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "InventoryItem" ADD CONSTRAINT "InventoryItem_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "InventoryUsage" ADD CONSTRAINT "InventoryUsage_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "InventoryItem"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "Notification" ADD CONSTRAINT "Notification_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-    ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    DO $$ BEGIN ALTER TABLE "User" ADD CONSTRAINT "User_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "StaffMember" ADD CONSTRAINT "StaffMember_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "Order" ADD CONSTRAINT "Order_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "Order" ADD CONSTRAINT "Order_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "InventoryItem" ADD CONSTRAINT "InventoryItem_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "InventoryUsage" ADD CONSTRAINT "InventoryUsage_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "InventoryItem"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "Notification" ADD CONSTRAINT "Notification_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
   `;
+}
+
+function splitSQLStatements(sql: string): string[] {
+  // Split on ';' but not inside $$ dollar-quoted blocks
+  const statements: string[] = [];
+  let current = '';
+  let inDollarQuote = false;
+  for (let i = 0; i < sql.length; i++) {
+    if (sql[i] === '$' && sql[i + 1] === '$') {
+      inDollarQuote = !inDollarQuote;
+      current += '$$';
+      i++;
+    } else if (sql[i] === ';' && !inDollarQuote) {
+      const trimmed = current.trim();
+      if (trimmed && !trimmed.startsWith('--')) statements.push(trimmed);
+      current = '';
+    } else {
+      current += sql[i];
+    }
+  }
+  const trimmed = current.trim();
+  if (trimmed && !trimmed.startsWith('--')) statements.push(trimmed);
+  return statements;
 }
 
 async function applyMigrationSQL(prismaClient: PrismaClient, sql: string) {
   // Split the SQL by statements and execute each one
-  const statements = sql
-    .split(';')
-    .map((stmt) => stmt.trim())
-    .filter((stmt) => stmt && !stmt.startsWith('--'));
+  const statements = splitSQLStatements(sql);
 
   for (let i = 0; i < statements.length; i++) {
     const statement = statements[i];
