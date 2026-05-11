@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { errorResponse, successResponse } from '@/lib/utils/response';
-import { generateVerificationCode, getVerificationCodeExpiry } from '@/lib/auth/verification';
-import { sendVerificationEmail } from '@/lib/email/client';
+import { generateVerificationToken } from '@/lib/auth/verification-token';
+import { checkVerificationRateLimit, logVerificationAttempt } from '@/lib/auth/rate-limit';
+import { sendVerificationLinkEmail } from '@/lib/email/client';
 
 /**
- * POST /api/stores/resend-code - Resend verification code to email
+ * POST /api/stores/resend-code - Resend a new verification link
  */
 export async function POST(request: NextRequest) {
   try {
@@ -19,56 +20,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find store by email
-    const store = await prisma.store.findUnique({
-      where: { email },
-    });
+    // Rate limit check (shared with verify endpoint)
+    const { allowed } = await checkVerificationRateLimit(email);
+    if (!allowed) {
+      await logVerificationAttempt(email, false, 'RATE_LIMITED');
+      return NextResponse.json(
+        errorResponse('RATE_LIMITED', 'Too many attempts. Please try again in 15 minutes.'),
+        { status: 429, headers: { 'Retry-After': '900' } }
+      );
+    }
+
+    const store = await prisma.store.findUnique({ where: { email } });
 
     if (!store) {
+      // Do not reveal whether the email exists
       return NextResponse.json(
-        errorResponse('NOT_FOUND', 'Store not found'),
-        { status: 404 }
+        successResponse({ message: 'If that email is registered, a new verification link has been sent.' })
       );
     }
 
-    // If already verified, return success but inform user
     if (store.emailVerified) {
       return NextResponse.json(
-        successResponse({
-          message: 'Your email is already verified. You can now log in.',
-        })
+        successResponse({ message: 'Your email is already verified. You can now log in.' })
       );
     }
 
-    // Generate new verification code
-    const verificationCode = generateVerificationCode();
-    const verificationCodeExpiry = getVerificationCodeExpiry();
+    const { rawToken, tokenHash, expiry } = generateVerificationToken();
 
-    // Update store with new code
+    const host = request.headers.get('host') ?? 'localhost:3000';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const verificationLink = `${protocol}://${host}/verify-email?token=${rawToken}&email=${encodeURIComponent(email)}`;
+
     await prisma.store.update({
       where: { email },
-      data: {
-        verificationCode,
-        verificationCodeExpiry,
-      },
+      data: { verificationCode: tokenHash, verificationCodeExpiry: expiry },
     });
 
-    // Send verification email
-    await sendVerificationEmail(email, store.name, verificationCode);
-
-    console.log(`✓ Verification code resent to ${email}: ${verificationCode}`);
+    sendVerificationLinkEmail(store.name, email, verificationLink).catch((err) =>
+      console.error('[RESEND] Failed to send verification email:', err)
+    );
 
     return NextResponse.json(
       successResponse({
-        message: 'Verification code has been resent to your email. Please check your inbox.',
+        message: 'A new verification link has been sent to your email. Please check your inbox.',
       })
     );
   } catch (error) {
-    console.error('Error resending verification code:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to resend verification code';
+    console.error('[RESEND] Error:', error);
     return NextResponse.json(
-      errorResponse('INTERNAL_ERROR', errorMessage),
+      errorResponse('INTERNAL_ERROR', 'Failed to resend verification link'),
       { status: 500 }
     );
   }
 }
+

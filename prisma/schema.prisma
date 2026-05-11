@@ -252,6 +252,19 @@ model AuditLog {
   @@index([createdAt])
 }
 
+// ===== VERIFICATION ATTEMPTS (pre-auth audit log) =====
+model VerificationAttempt {
+  id          String   @id @default(cuid())
+  email       String
+  ipAddress   String?
+  success     Boolean
+  reason      String?  // 'SUCCESS' | 'INVALID_TOKEN' | 'EXPIRED' | 'ALREADY_VERIFIED' | 'RATE_LIMITED'
+  createdAt   DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
 // ===== ADVERTS =====
 model Advert {
   id        String   @id @default(cuid())

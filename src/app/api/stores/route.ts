@@ -4,6 +4,8 @@ import { errorResponse, successResponse } from '@/lib/utils/response';
 import { hashPassword } from '@/lib/auth/hash';
 import { getTokenFromHeader, verifyToken } from '@/lib/auth/jwt';
 import { runMigrations } from '@/lib/db/migrations';
+import { generateVerificationToken } from '@/lib/auth/verification-token';
+import { sendVerificationLinkEmail } from '@/lib/email/client';
 
 /**
  * GET /api/stores - Get stores based on user role
@@ -184,8 +186,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create store and admin user together (email auto-verified)
+    // Create store and admin user together
     try {
+      const { rawToken, tokenHash, expiry } = generateVerificationToken();
+
+      const host = request.headers.get('host') ?? 'localhost:3000';
+      const protocol = host.includes('localhost') ? 'http' : 'https';
+      const verificationLink = `${protocol}://${host}/verify-email?token=${rawToken}&email=${encodeURIComponent(email)}`;
+
       const store = await prisma.store.create({
         data: {
           name,
@@ -193,9 +201,10 @@ export async function POST(request: NextRequest) {
           address,
           phone,
           currency: currency || 'USD',
-          emailVerified: true, // Auto-verify on creation
-          isApproved: false, // Requires superadmin approval
-          // Create the admin user for this store
+          emailVerified: false,
+          verificationCode: tokenHash,
+          verificationCodeExpiry: expiry,
+          isApproved: false,
           users: {
             create: {
               email,
@@ -205,15 +214,21 @@ export async function POST(request: NextRequest) {
             },
           },
         },
-        include: {
-          users: true,
-        },
+        include: { users: true },
       });
+
+      // Send verification email (non-blocking — store is already created)
+      sendVerificationLinkEmail(name, email, verificationLink).catch((err) =>
+        console.error('[REGISTER] Failed to send verification email:', err)
+      );
 
       return NextResponse.json(
         successResponse({
-          ...store,
-          message: 'Store created successfully! Your store is pending approval from a superadmin.',
+          id: store.id,
+          name: store.name,
+          email: store.email,
+          message:
+            'Store registered successfully! Please check your email to verify your address. Your store will be active after email verification and superadmin approval.',
         }),
         { status: 201 }
       );

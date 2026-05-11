@@ -94,6 +94,55 @@ export async function sendVerificationEmail(
   });
 }
 
+/**
+ * Send a secure verification link email to a new store owner.
+ * The link embeds the raw token — the raw token is never stored server-side.
+ */
+export async function sendVerificationLinkEmail(
+  storeName: string,
+  email: string,
+  verificationLink: string
+): Promise<boolean> {
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 32px 24px; }
+    .header { background: #000; padding: 24px; border-radius: 8px 8px 0 0; text-align: center; }
+    .header h1 { color: #FFD700; margin: 0; font-size: 26px; }
+    .body { background: #f9f9f9; padding: 32px 24px; border: 1px solid #e0e0e0; }
+    .cta { display: block; margin: 28px auto; padding: 14px 32px; background: #FFD700; color: #000;
+           text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;
+           text-align: center; max-width: 240px; }
+    .note { font-size: 12px; color: #888; margin-top: 24px; }
+    .footer { text-align: center; font-size: 11px; color: #aaa; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h1>Sales Portal</h1></div>
+    <div class="body">
+      <h2 style="margin-top:0">Verify your email address</h2>
+      <p>Hi <strong>${storeName}</strong>,</p>
+      <p>Thank you for registering. Click the button below to verify your email address and activate your store account.</p>
+      <a href="${verificationLink}" class="cta">Verify Email</a>
+      <p>Or copy and paste this link into your browser:</p>
+      <p style="word-break:break-all;font-size:13px;color:#555">${verificationLink}</p>
+      <p class="note">This link expires in 24 hours and can only be used once. If you did not register for Sales Portal, you can safely ignore this email.</p>
+    </div>
+    <div class="footer">Sales Portal &mdash; Powered by Questbridge Ltd</div>
+  </div>
+</body>
+</html>`;
+
+  return sendEmail({
+    to: email,
+    subject: `Verify your Sales Portal account — ${storeName}`,
+    html,
+  });
+}
+
 export interface ReceiptEmailOptions {
   to: string;
   storeName: string;

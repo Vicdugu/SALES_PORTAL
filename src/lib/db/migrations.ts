@@ -222,6 +222,20 @@ async function getMigrationSQL(): Promise<string> {
     CREATE INDEX IF NOT EXISTS "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
     CREATE INDEX IF NOT EXISTS "Transaction_storeId_idx" ON "Transaction"("storeId");
 
+    -- CreateTable VerificationAttempt
+    CREATE TABLE IF NOT EXISTS "VerificationAttempt" (
+        "id" TEXT NOT NULL,
+        "email" TEXT NOT NULL,
+        "ipAddress" TEXT,
+        "success" BOOLEAN NOT NULL,
+        "reason" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+        CONSTRAINT "VerificationAttempt_pkey" PRIMARY KEY ("id")
+    );
+    CREATE INDEX IF NOT EXISTS "VerificationAttempt_email_idx" ON "VerificationAttempt"("email");
+    CREATE INDEX IF NOT EXISTS "VerificationAttempt_createdAt_idx" ON "VerificationAttempt"("createdAt");
+
     -- AddForeignKey
     DO $$ BEGIN ALTER TABLE "User" ADD CONSTRAINT "User_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     DO $$ BEGIN ALTER TABLE "StaffMember" ADD CONSTRAINT "StaffMember_storeId_fkey" FOREIGN KEY ("storeId") REFERENCES "Store"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
