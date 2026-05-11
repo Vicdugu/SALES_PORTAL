@@ -35,17 +35,17 @@
     "zod": "^4.4.3",
     "zustand": "^5.0.12",
     "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
-  },
-  "devDependencies": {
+    "tailwindcss": "^4",
     "@types/bcrypt": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "typescript": "^5"
+  },
+  "devDependencies": {
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
-    "fast-check": "^4.7.0",
-    "typescript": "^5"
+    "fast-check": "^4.7.0"
   }
 }
