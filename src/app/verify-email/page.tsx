@@ -35,8 +35,14 @@ export default function VerifyEmailPage() {
           throw new Error(checkData.error?.message || checkData.error || 'Verification failed');
         }
 
-        if (checkData.data?.valid) {
+        if (checkData.data?.alreadyVerified || checkData.data?.valid) {
           setStoreName(checkData.data?.storeName || '');
+
+          if (checkData.data?.alreadyVerified) {
+            setSuccess(true);
+            setTimeout(() => router.push('/login'), 3000);
+            return;
+          }
 
           // Now verify the email
           const verifyResponse = await fetch('/api/stores/verify', {
@@ -58,6 +64,14 @@ export default function VerifyEmailPage() {
           setTimeout(() => {
             router.push('/login');
           }, 3000);
+        } else {
+          // Token invalid or expired — show actionable error
+          const reason = checkData.data?.reason;
+          if (reason === 'EXPIRED') {
+            throw new Error('This verification link has expired. Please request a new one.');
+          } else {
+            throw new Error('This verification link is invalid or has already been used. Please request a new link.');
+          }
         }
       } catch (err: any) {
         const errorMessage =
@@ -126,20 +140,25 @@ export default function VerifyEmailPage() {
             <div className="text-center">
               <div className="text-5xl mb-4">❌</div>
               <h2 className="text-2xl font-bold text-red-700 mb-2">Verification Failed</h2>
-              <p className="text-gray-700 mb-4">{error}</p>
-              <p className="text-gray-600 text-sm mb-6">
-                This verification link may have expired or is invalid.
-              </p>
-              <div className="flex gap-4 justify-center flex-wrap">
+              <p className="text-gray-700 mb-6">{error}</p>
+              <div className="flex gap-3 justify-center flex-wrap">
+                {email && (
+                  <Link
+                    href={`/verify-code?email=${encodeURIComponent(email)}`}
+                    className="inline-block bg-amber-600 text-white py-2 px-6 rounded-lg hover:bg-amber-700 font-medium transition"
+                  >
+                    Resend Link
+                  </Link>
+                )}
                 <Link
                   href="/register"
-                  className="inline-block bg-amber-600 text-white py-2 px-6 rounded-lg hover:bg-amber-700 font-medium transition"
+                  className="inline-block bg-gray-600 text-white py-2 px-6 rounded-lg hover:bg-gray-700 font-medium transition"
                 >
                   Register Again
                 </Link>
                 <Link
                   href="/login"
-                  className="inline-block bg-gray-600 text-white py-2 px-6 rounded-lg hover:bg-gray-700 font-medium transition"
+                  className="inline-block bg-gray-400 text-white py-2 px-6 rounded-lg hover:bg-gray-500 font-medium transition"
                 >
                   Back to Login
                 </Link>

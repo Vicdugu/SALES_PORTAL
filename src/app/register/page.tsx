@@ -92,13 +92,13 @@ export default function RegisterStorePage() {
         throw new Error(data.error?.message || data.error || 'Failed to create store');
       }
 
-      // Redirect to login page
+      // Redirect to email verification waiting page
       setTimeout(() => {
-        router.push('/login');
+        router.push(`/verify-code?email=${encodeURIComponent(formData.email)}`);
       }, 2000);
 
       setSuccess(
-        `Store created successfully! 🎉\n\nYour store is pending approval from a superadmin.\nYou will receive an email once approved.\n\nRedirecting to login page...`
+        `Store registered successfully! 🎉\n\nA verification link has been sent to ${formData.email}.\nPlease check your email and click the link to verify your account.\n\nRedirecting...`
       );
     } catch (err: any) {
       const errorMessage = 
