@@ -103,13 +103,16 @@ export function SystemCleanup() {
         }
       }
 
+      const deletedIds = new Set(selectedStores);
       setMessage({
         type: 'success',
-        text: `Successfully deleted ${selectedStores.size} store(s)`,
+        text: `Successfully deleted ${deletedIds.size} store(s)`,
       });
+      // Optimistically remove deleted stores from the list immediately
+      setStores((prev) => prev.filter((s) => !deletedIds.has(s.id)));
       setSelectedStores(new Set());
       setConfirmDelete(false);
-      fetchStores();
+      fetchStores(); // background refresh for authoritative state
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message });
     } finally {

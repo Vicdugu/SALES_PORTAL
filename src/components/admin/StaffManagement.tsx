@@ -61,11 +61,13 @@ export function StaffManagement() {
       const response = await apiCall('/api/stores');
       if (response.ok) {
         const data = await response.json();
-        setStores(data.data || []);
-        // Auto-select first store
-        if (data.data && data.data.length > 0) {
-          setSelectedStore(data.data[0].id);
-        }
+        const storeList: Store[] = data.data || [];
+        setStores(storeList);
+        // Keep existing selection if still valid; otherwise pick the first store
+        setSelectedStore((prev) => {
+          if (prev && storeList.some((s) => s.id === prev)) return prev;
+          return storeList.length > 0 ? storeList[0].id : '';
+        });
       } else {
         setError('Failed to load stores');
       }
