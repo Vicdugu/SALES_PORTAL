@@ -183,8 +183,23 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Determine caller role from JWT
+    let callerRole = 'STAFF';
+    const authHeader = request.headers.get('authorization');
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        const verified = await jwtVerify(token, JWT_SECRET);
+        callerRole = verified.payload.role as string;
+      } catch {
+        // continue with default
+      }
+    }
+
     const storeId = await getStoreId();
-    if (!storeId) {
+
+    // Non-superadmins must have a storeId
+    if (!storeId && callerRole !== 'SUPERADMIN') {
       return NextResponse.json(
         errorResponse('UNAUTHORIZED', 'Store ID not found'),
         { status: 401 }
@@ -202,7 +217,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Verify the user belongs to the current store
+    // Verify the user exists
     const userToDelete = await prisma.user.findUnique({
       where: { id: userId },
     });
@@ -214,8 +229,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Security check: ensure user belongs to the current store
-    if (userToDelete.storeId !== storeId) {
+    // Security check: non-superadmins can only delete from their own store
+    if (callerRole !== 'SUPERADMIN' && userToDelete.storeId !== storeId) {
       return NextResponse.json(
         errorResponse('FORBIDDEN', 'Cannot delete staff from other stores'),
         { status: 403 }
