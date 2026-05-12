@@ -60,17 +60,3 @@ export function formatCurrency(amount: number, currency: string = 'USD'): string
   return `${symbol}${amount.toFixed(2)}`;
 }
 
-/**
- * Get decimal places for currency (most use 2, JPY uses 0)
- */
-export function getCurrencyDecimals(currency: string = 'USD'): number {
-  return currency === 'JPY' ? 0 : 2;
-}
-
-/**
- * Format amount with currency decimals
- */
-export function formatCurrencyAmount(amount: number, currency: string = 'USD'): string {
-  const decimals = getCurrencyDecimals(currency);
-  return amount.toFixed(decimals);
-}

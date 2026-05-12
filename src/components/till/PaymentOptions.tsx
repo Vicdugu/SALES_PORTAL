@@ -27,16 +27,6 @@ interface PaymentRecord {
   amount: number;
 }
 
-//
-// Single-payment flow:
-//   Select method → Confirm Payment → ReceiptModal
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface PaymentRecord {
-  method: PaymentMethod;
-  amount: number;
-}
-
 interface PaymentOptionsProps {
   orderId?: string;
   onPaymentSelected: (method: PaymentMethod) => void;

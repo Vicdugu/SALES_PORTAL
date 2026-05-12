@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runMigrations } from '@/lib/db/migrations';
 
-export async function GET(request: NextRequest) {
-  // Security: Only allow from localhost or specific authorized sources
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('host');
-  
+export async function GET() {
   // In production, you might want to add an authorization token check
   try {
     const result = await runMigrations();

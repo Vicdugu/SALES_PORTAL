@@ -84,16 +84,8 @@ export function StaffManagement() {
       setError(null);
       setStaff([]); // Clear staff before fetching
       
-      // DEBUG: Check what storeId we have
+      // Check what storeId we have
       const storedStoreId = typeof window !== 'undefined' ? localStorage.getItem('storeId') : null;
-      const storedUser = typeof window !== 'undefined' && localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null;
-      
-      console.log('[StaffManagement] fetchStaff called', {
-        storedStoreId,
-        userRole: user?.role,
-        userStoreId: user?.storeId,
-        storedUserStoreId: storedUser?.storeId,
-      });
       
       if (!storedStoreId && user?.role !== 'SUPERADMIN') {
         setError('Store ID not found. Please log in again.');
@@ -107,7 +99,6 @@ export function StaffManagement() {
       const response = await apiCall(url);
       if (response.ok) {
         const data = await response.json();
-        console.log('[StaffManagement] Staff fetched successfully', { count: data.data?.length });
         setStaff(data.data || []);
       } else {
         const errorData = await response.json();
@@ -130,16 +121,9 @@ export function StaffManagement() {
       setLoading(true);
       setStaff([]); // Clear staff before fetching
       
-      console.log('[StaffManagement] fetchStaffForStore called with storeId:', storeId);
-      
       const response = await apiCall(`/api/users?storeId=${storeId}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('[StaffManagement] Staff fetched successfully for store', storeId, {
-          rawResponse: data,
-          staffCount: data.data?.length,
-          staff: data.data,
-        });
         setStaff(data.data || []);
       } else {
         const errorData = await response.json();
@@ -209,7 +193,7 @@ export function StaffManagement() {
         requestBody.storeId = selectedStore;
       }
 
-      console.log('[StaffManagement] Creating staff with request body:', requestBody);
+      console.log('[StaffManagement] Creating staff with request body:', { name: requestBody.name, email: requestBody.email, role: requestBody.role });
 
       const response = await apiCall('/api/users', {
         method: 'POST',
@@ -223,8 +207,6 @@ export function StaffManagement() {
       }
 
       const newUser = await response.json();
-      
-      console.log('[StaffManagement] Staff created successfully:', newUser);
       
       const storeName = stores.find(s => s.id === selectedStore)?.name || 'Store';
       
@@ -250,10 +232,8 @@ export function StaffManagement() {
 
       // Refresh staff list to ensure new staff appears
       if (user?.role === 'SUPERADMIN' && selectedStore) {
-        console.log('[StaffManagement] Refreshing staff list for superadmin store:', selectedStore);
         setTimeout(() => fetchStaffForStore(selectedStore), 500);
       } else {
-        console.log('[StaffManagement] Refreshing staff list for store admin');
         setTimeout(() => fetchStaff(), 500);
       }
 

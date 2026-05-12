@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { staffId, items, notes, paymentMethod, payments } = body;
+    const { items, notes, paymentMethod, payments } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json(

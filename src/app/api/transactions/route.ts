@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       try {
         const verified = await jwtVerify(token, JWT_SECRET);
         userRole = verified.payload.role as string;
-      } catch (e) {
+      } catch {
         // Token verification failed, continue with default
       }
     }
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Format response
-    const transactions = orders.map((order) => ({
+    const transactions = orders.map((order: { id: string; orderNumber: string; storeId: string; store?: { name: string } | null; total: number; paymentMethod: string; status: string; createdAt: Date; items: unknown[] }) => ({
       id: order.id,
       orderNumber: order.orderNumber,
       storeId: order.storeId,

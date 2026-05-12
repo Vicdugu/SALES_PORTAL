@@ -114,7 +114,7 @@ export async function listTestStores() {
       return testStores;
     }
 
-    testStores.forEach((store, index) => {
+    testStores.forEach((store: { id: string; name: string; email: string; createdAt: Date; _count: { users: number; orders: number } }, index: number) => {
       console.log(
         `\n${index + 1}. ${store.name} (${store.email})`
       );

@@ -20,26 +20,18 @@ export async function GET(request: NextRequest) {
       try {
         const verified = await jwtVerify(token, JWT_SECRET);
         userRole = verified.payload.role as string;
-      } catch (e) {
+      } catch {
         // Token verification failed, continue with default
       }
     }
 
     let storeId = await getStoreId();
     
-    // DEBUG LOGGING
-    console.log('=== API /users GET DEBUG ===');
-    console.log('x-store-id header:', request.headers.get('x-store-id'));
-    console.log('storeId from getStoreId():', storeId);
-    console.log('userRole:', userRole);
-    console.log('Host:', request.headers.get('host'));
-    
     // For superadmins, ALWAYS prefer explicit storeId parameter
     if (userRole === 'SUPERADMIN') {
       const storeIdParam = request.nextUrl.searchParams.get('storeId');
       if (storeIdParam) {
         storeId = storeIdParam;
-        console.log('[GET /users] SuperAdmin querying staff for storeId:', storeId);
       }
     }
 
@@ -76,8 +68,6 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    console.log('[GET /users] Fetching staff for store:', { storeId, count: users.length, users });
-
     return NextResponse.json(successResponse(users));
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -110,10 +100,8 @@ export async function POST(request: NextRequest) {
           // Only superadmins can specify storeId in request body
           if (verified.payload.role === 'SUPERADMIN') {
             storeId = bodyStoreId;
-            console.log('[POST /users] SuperAdmin creating staff for storeId:', storeId);
           }
-        } catch (e) {
-          console.log('[POST /users] JWT verification failed:', e);
+        } catch {
           // JWT verification failed, storeId will remain null and fail below
         }
       }

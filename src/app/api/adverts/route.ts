@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     let body;
     try {
       body = await request.json();
-    } catch (parseError) {
+    } catch {
       return NextResponse.json({ error: { message: 'Invalid request body. Image may be too large (max 500KB)' } }, { status: 400 });
     }
 

@@ -78,13 +78,13 @@ export async function POST(request: NextRequest) {
       subtotal: order.subtotal,
       tax: order.tax,
       total: order.total,
-      items: order.items.map((item) => ({
+      items: order.items.map((item: { name: string; quantity: number; unitPrice: number; notes?: string | null }) => ({
         name: item.name,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         notes: item.notes || undefined,
       })),
-      payments: order.payments.map((payment) => ({
+      payments: order.payments.map((payment: { paymentMethod: string; amount: number }) => ({
         method: payment.paymentMethod,
         amount: payment.amount,
       })),

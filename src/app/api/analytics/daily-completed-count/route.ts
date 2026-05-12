@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
@@ -8,7 +8,7 @@ import { errorResponse, successResponse } from '@/lib/utils/response';
  * Returns the count of orders completed today (current calendar day)
  * Automatically resets at midnight based on timestamp logic
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const storeId = await getStoreId();
     if (!storeId) {
