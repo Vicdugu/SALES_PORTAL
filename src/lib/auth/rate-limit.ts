@@ -10,18 +10,25 @@ const RATE_LIMIT_WINDOW_MINUTES = 15;
 export async function checkVerificationRateLimit(
   email: string
 ): Promise<{ allowed: boolean; remaining: number }> {
-  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000);
+  try {
+    const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000);
 
-  const failedCount = await prisma.verificationAttempt.count({
-    where: {
-      email,
-      success: false,
-      createdAt: { gte: windowStart },
-    },
-  });
+    const failedCount = await prisma.verificationAttempt.count({
+      where: {
+        email,
+        success: false,
+        createdAt: { gte: windowStart },
+      },
+    });
 
-  const remaining = Math.max(0, MAX_FAILED_ATTEMPTS - failedCount);
-  return { allowed: failedCount < MAX_FAILED_ATTEMPTS, remaining };
+    const remaining = Math.max(0, MAX_FAILED_ATTEMPTS - failedCount);
+    return { allowed: failedCount < MAX_FAILED_ATTEMPTS, remaining };
+  } catch {
+    // If the table doesn't exist yet (first deployment), fail open — allow the attempt.
+    // The table will be created by runMigrations() before this is called again.
+    console.error('[RATE_LIMIT] Could not query VerificationAttempt table — failing open');
+    return { allowed: true, remaining: MAX_FAILED_ATTEMPTS };
+  }
 }
 
 export type VerificationReason =

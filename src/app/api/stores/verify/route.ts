@@ -151,7 +151,8 @@ export async function POST(request: NextRequest) {
       successResponse({ message: 'Email verified successfully! You can now log in to your store.' })
     );
   } catch (error) {
-    console.error('[VERIFY POST] Error:', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[VERIFY POST] Error:', msg);
     return NextResponse.json(
       errorResponse('INTERNAL_ERROR', 'Verification failed'),
       { status: 500 }
