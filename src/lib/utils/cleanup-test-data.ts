@@ -1,21 +1,59 @@
 import { prisma } from '@/lib/db/client';
 
 /**
- * Cleanup utility to remove test accounts and test stores
- * This should only be run in development or when explicitly requested
+ * Cleanup utility to remove test/demo/placeholder stores and all linked data.
+ * Safe to run in development or when explicitly called from the admin API.
  */
+
+// ─── Detection criteria ──────────────────────────────────────────────────────
+
+const TEST_EMAIL_DOMAINS = [
+  '@example.com',
+  '@test.com',
+  '@demo.com',
+  '@sample.com',
+  '@fake.com',
+  '@placeholder.com',
+  '@temp.com',
+  '@dummy.com',
+];
+
+const TEST_NAME_KEYWORDS = [
+  'test',
+  'demo',
+  'sample',
+  'placeholder',
+  'temp',
+  'temporary',
+  'dummy',
+  'fake',
+  'dev store',
+  'development',
+  'trial',
+  'sandbox',
+];
+
+function buildTestStoreFilter() {
+  return {
+    OR: [
+      ...TEST_EMAIL_DOMAINS.map((domain) => ({
+        email: { endsWith: domain },
+      })),
+      ...TEST_NAME_KEYWORDS.map((keyword) => ({
+        name: { contains: keyword, mode: 'insensitive' as const },
+      })),
+    ],
+  };
+}
+
+// ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function removeTestAccounts() {
   try {
     console.log('🧹 Starting test account cleanup...');
 
-    // Find all test stores (those with @example.com emails)
     const testStores = await prisma.store.findMany({
-      where: {
-        email: {
-          endsWith: '@example.com',
-        },
-      },
+      where: buildTestStoreFilter(),
       include: {
         _count: {
           select: { users: true, orders: true },
@@ -25,14 +63,12 @@ export async function removeTestAccounts() {
 
     console.log(`Found ${testStores.length} test stores`);
 
-    // Delete all test stores and their associated data
-    // Cascade delete will remove: users, orders, inventory items, staff members
+    // Cascade delete removes: users, orders, orderItems, paymentRecords,
+    // inventory, adverts, notifications, auditLogs, staffMembers
     let deletedCount = 0;
     for (const store of testStores) {
       try {
-        await prisma.store.delete({
-          where: { id: store.id },
-        });
+        await prisma.store.delete({ where: { id: store.id } });
         deletedCount++;
         console.log(`✓ Deleted test store: ${store.name} (${store.email})`);
       } catch (error) {
@@ -60,25 +96,17 @@ export async function removeSpecificTestStore(storeName: string) {
 
     const store = await prisma.store.findFirst({
       where: {
-        name: {
-          contains: storeName,
-        },
+        name: { contains: storeName, mode: 'insensitive' },
+        ...{ OR: buildTestStoreFilter().OR },
       },
     });
 
     if (!store) {
-      console.log(`✗ Store not found: ${storeName}`);
-      return { success: false, message: `Store '${storeName}' not found` };
+      console.log(`✗ Test store not found: ${storeName}`);
+      return { success: false, message: `Test store '${storeName}' not found` };
     }
 
-    if (!store.email.endsWith('@example.com')) {
-      console.log(`✗ Store is not a test store (does not use @example.com email)`);
-      return { success: false, message: 'This is not a test store and cannot be removed' };
-    }
-
-    await prisma.store.delete({
-      where: { id: store.id },
-    });
+    await prisma.store.delete({ where: { id: store.id } });
 
     console.log(`✅ Successfully deleted test store: ${store.name}`);
     return {
@@ -94,16 +122,13 @@ export async function removeSpecificTestStore(storeName: string) {
 export async function listTestStores() {
   try {
     const testStores = await prisma.store.findMany({
-      where: {
-        email: {
-          endsWith: '@example.com',
-        },
-      },
+      where: buildTestStoreFilter(),
       include: {
         _count: {
           select: { users: true, orders: true },
         },
       },
+      orderBy: { createdAt: 'asc' },
     });
 
     console.log(`\n📊 Test Stores Report:`);
@@ -115,18 +140,10 @@ export async function listTestStores() {
     }
 
     testStores.forEach((store: { id: string; name: string; email: string; createdAt: Date; _count: { users: number; orders: number } }, index: number) => {
-      console.log(
-        `\n${index + 1}. ${store.name} (${store.email})`
-      );
-      console.log(
-        `   ID: ${store.id}`
-      );
-      console.log(
-        `   Users: ${store._count.users} | Orders: ${store._count.orders}`
-      );
-      console.log(
-        `   Created: ${store.createdAt.toLocaleDateString()}`
-      );
+      console.log(`\n${index + 1}. ${store.name} (${store.email})`);
+      console.log(`   ID: ${store.id}`);
+      console.log(`   Users: ${store._count.users} | Orders: ${store._count.orders}`);
+      console.log(`   Created: ${store.createdAt.toLocaleDateString()}`);
     });
 
     console.log('\n' + '═'.repeat(80));

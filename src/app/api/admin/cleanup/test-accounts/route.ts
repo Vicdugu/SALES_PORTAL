@@ -3,10 +3,75 @@ import { prisma } from '@/lib/db/client';
 import { verifyToken } from '@/lib/auth/jwt';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 
+// ─── Test-store detection ────────────────────────────────────────────────────
+// A store is considered a test/demo/placeholder tenant if any of these match.
+
+const TEST_EMAIL_DOMAINS = [
+  '@example.com',
+  '@test.com',
+  '@demo.com',
+  '@sample.com',
+  '@fake.com',
+  '@placeholder.com',
+  '@temp.com',
+  '@dummy.com',
+];
+
+const TEST_NAME_KEYWORDS = [
+  'test',
+  'demo',
+  'sample',
+  'placeholder',
+  'temp',
+  'temporary',
+  'dummy',
+  'fake',
+  'dev store',
+  'development',
+  'trial',
+  'sandbox',
+];
+
+/** Returns the Prisma OR filter that identifies test stores. */
+function buildTestStoreFilter() {
+  return {
+    OR: [
+      ...TEST_EMAIL_DOMAINS.map((domain) => ({
+        email: { endsWith: domain },
+      })),
+      ...TEST_NAME_KEYWORDS.map((keyword) => ({
+        name: { contains: keyword, mode: 'insensitive' as const },
+      })),
+    ],
+  };
+}
+
+/**
+ * Derive a human-readable reason why this store was flagged.
+ * Returns the first matching reason found.
+ */
+function flagReason(store: { name: string; email: string }): string {
+  for (const domain of TEST_EMAIL_DOMAINS) {
+    if (store.email.toLowerCase().endsWith(domain)) {
+      return `Test email domain (${domain})`;
+    }
+  }
+  for (const keyword of TEST_NAME_KEYWORDS) {
+    if (store.name.toLowerCase().includes(keyword)) {
+      return `Test name keyword ("${keyword}")`;
+    }
+  }
+  return 'Flagged as test store';
+}
+
 /**
  * POST /api/admin/cleanup/test-accounts
- * Removes all test accounts and test stores (with @example.com emails)
- * Requires SUPERADMIN role
+ * Removes all test accounts and test stores.
+ * Requires SUPERADMIN role.
+ *
+ * Actions:
+ *   list        — return all test stores (with reason why each was flagged)
+ *   cleanup-all — delete all test stores and every piece of related data
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,64 +93,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { action } = await request.json();
+    const body = await request.json();
+    const { action } = body;
 
+    // ── LIST ────────────────────────────────────────────────────────────────
     if (action === 'list') {
-      // List all test stores
       const testStores = await prisma.store.findMany({
-        where: {
-          email: {
-            endsWith: '@example.com',
-          },
-        },
+        where: buildTestStoreFilter(),
         select: {
           id: true,
           name: true,
           email: true,
+          isApproved: true,
           createdAt: true,
           _count: {
             select: {
               users: true,
               orders: true,
+              inventory: true,
+              adverts: true,
             },
           },
         },
+        orderBy: { createdAt: 'asc' },
       });
+
+      const annotated = testStores.map((s: { name: string; email: string }) => ({
+        ...s,
+        reason: flagReason(s),
+      }));
 
       return NextResponse.json(
         successResponse({
-          testStores,
-          totalCount: testStores.length,
-          message: `Found ${testStores.length} test stores`,
+          testStores: annotated,
+          totalCount: annotated.length,
+          message: `Found ${annotated.length} test store(s)`,
         })
       );
-    } else if (action === 'cleanup-all') {
-      // Delete all test stores
+    }
+
+    // ── CLEANUP-ALL ─────────────────────────────────────────────────────────
+    if (action === 'cleanup-all') {
       const testStores = await prisma.store.findMany({
-        where: {
-          email: {
-            endsWith: '@example.com',
-          },
-        },
+        where: buildTestStoreFilter(),
+        select: { id: true, name: true, email: true },
       });
 
       let deletedCount = 0;
-      const deletedStores = [];
+      const deletedStores: { id: string; name: string; email: string }[] = [];
+      const failedStores: { id: string; name: string; error: string }[] = [];
 
       for (const store of testStores) {
         try {
-          await prisma.store.delete({
-            where: { id: store.id },
-          });
+          // Cascade delete: Prisma schema has onDelete: Cascade on all Store
+          // relations, so a single store.delete removes users, orders,
+          // orderItems, paymentRecords, inventory, adverts, notifications,
+          // auditLogs, staffMembers automatically.
+          await prisma.store.delete({ where: { id: store.id } });
           deletedCount++;
-          deletedStores.push({
+          deletedStores.push({ id: store.id, name: store.name, email: store.email });
+        } catch (err) {
+          console.error(`Failed to delete test store ${store.id}:`, err);
+          failedStores.push({
             id: store.id,
             name: store.name,
-            email: store.email,
+            error: err instanceof Error ? err.message : String(err),
           });
-          console.log(`✓ Deleted test store: ${store.name}`);
-        } catch (error) {
-          console.error(`✗ Failed to delete store ${store.id}:`, error);
         }
       }
 
@@ -93,65 +166,27 @@ export async function POST(request: NextRequest) {
         successResponse({
           deletedCount,
           deletedStores,
-          message: `Successfully deleted ${deletedCount} test store(s) and all associated accounts`,
+          failedStores,
+          message: `Deleted ${deletedCount} test store(s) and all associated data${
+            failedStores.length > 0 ? ` (${failedStores.length} failed)` : ''
+          }`,
         })
-      );
-    } else if (action === 'cleanup-by-name') {
-      // Delete a specific test store by name
-      const { storeName } = await request.json();
-
-      if (!storeName) {
-        return NextResponse.json(
-          errorResponse('VALIDATION_ERROR', 'Store name is required'),
-          { status: 400 }
-        );
-      }
-
-      const store = await prisma.store.findFirst({
-        where: {
-          name: {
-            contains: storeName,
-          },
-          email: {
-            endsWith: '@example.com',
-          },
-        },
-      });
-
-      if (!store) {
-        return NextResponse.json(
-          errorResponse('NOT_FOUND', `Test store '${storeName}' not found`),
-          { status: 404 }
-        );
-      }
-
-      await prisma.store.delete({
-        where: { id: store.id },
-      });
-
-      console.log(`✓ Deleted test store: ${store.name}`);
-
-      return NextResponse.json(
-        successResponse({
-          deletedStore: {
-            id: store.id,
-            name: store.name,
-            email: store.email,
-          },
-          message: `Successfully deleted test store '${store.name}'`,
-        })
-      );
-    } else {
-      return NextResponse.json(
-        errorResponse('INVALID_ACTION', 'Invalid action parameter'),
-        { status: 400 }
       );
     }
-  } catch (error) {
-    console.error('Error cleaning up test accounts:', error);
+
     return NextResponse.json(
-      errorResponse('INTERNAL_ERROR', error instanceof Error ? error.message : 'Failed to cleanup test accounts'),
+      errorResponse('INVALID_ACTION', 'Valid actions: list, cleanup-all'),
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error('Error in test-accounts cleanup:', error);
+    return NextResponse.json(
+      errorResponse(
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : 'Failed to cleanup test accounts'
+      ),
       { status: 500 }
     );
   }
 }
+

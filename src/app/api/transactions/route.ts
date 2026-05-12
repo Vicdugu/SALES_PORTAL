@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Format response
-    const transactions = orders.map((order: { id: string; orderNumber: string; storeId: string; store?: { name: string } | null; total: number; paymentMethod: string; status: string; createdAt: Date; items: unknown[] }) => ({
+    const transactions = orders.map((order: { id: string; orderNumber: string; storeId: string; store?: { name: string } | null; total: number; paymentMethod: string | null; status: string; createdAt: Date; items: unknown[] }) => ({
       id: order.id,
       orderNumber: order.orderNumber,
       storeId: order.storeId,

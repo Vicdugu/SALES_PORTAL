@@ -17,6 +17,21 @@ interface Store {
   };
 }
 
+interface TestStore {
+  id: string;
+  name: string;
+  email: string;
+  isApproved: boolean;
+  createdAt: string;
+  reason: string;
+  _count: {
+    users: number;
+    orders: number;
+    inventory: number;
+    adverts: number;
+  };
+}
+
 export function SystemCleanup() {
   const { theme } = useTheme();
   const [stores, setStores] = useState<Store[]>([]);
@@ -24,7 +39,7 @@ export function SystemCleanup() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedStores, setSelectedStores] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [testStores, setTestStores] = useState<any[]>([]);
+  const [testStores, setTestStores] = useState<TestStore[]>([]);
 
   // Fetch stores on mount
   useEffect(() => {
@@ -224,7 +239,7 @@ export function SystemCleanup() {
       const data = await response.json();
       setMessage({
         type: 'success',
-        text: `${data.message} - Removed ${data.deletedCount} test store(s) and all their accounts`,
+        text: `${data.data?.message || 'Cleanup complete'} — Removed ${data.data?.deletedCount ?? 0} test store(s) and all their data${(data.data?.failedStores?.length ?? 0) > 0 ? ` (${data.data.failedStores.length} failed)` : ''}`,
       });
       setTestStores([]);
       fetchStores();
@@ -288,7 +303,7 @@ export function SystemCleanup() {
                   : 'bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white'
               }`}
             >
-              🗑️ Remove All Test Accounts ({testStores.length} test stores)
+              🗑️ Remove All Test Stores ({testStores.length}) — Clears all users, orders, inventory & adverts
             </button>
           )}
         </div>
@@ -383,23 +398,49 @@ export function SystemCleanup() {
       {testStores.length > 0 && (
         <div className={`${theme === 'dark' ? 'bg-red-900/30 border-red-800' : 'bg-red-50 border-red-200'} p-6 rounded-2xl border`}>
           <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-red-200' : 'text-red-900'}`}>
-            ⚠️ Test Accounts Found ({testStores.length} test stores)
+            ⚠️ Test / Demo Stores Detected ({testStores.length})
           </h3>
+          <p className={`text-xs mb-4 ${theme === 'dark' ? 'text-red-300/70' : 'text-red-700/70'}`}>
+            Detected by email domain (@example.com, @test.com, @demo.com…) or store name keyword (test, demo, sample, placeholder…).
+            Deleting removes ALL linked users, orders, inventory, adverts, receipts and payment logs.
+          </p>
           <div className="space-y-3">
             {testStores.map((store) => (
               <div
                 key={store.id}
                 className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-red-900/50 border-red-800' : 'bg-white border-red-200'} border text-sm`}
               >
-                <div className={`font-semibold ${theme === 'dark' ? 'text-red-200' : 'text-red-900'}`}>
-                  {store.name}
+                <div className="flex items-start justify-between gap-2">
+                  <div className={`font-semibold ${theme === 'dark' ? 'text-red-200' : 'text-red-900'}`}>
+                    {store.name}
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${theme === 'dark' ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-700'}`}>
+                    {store.reason}
+                  </span>
                 </div>
-                <div className={`text-xs ${theme === 'dark' ? 'text-red-300/70' : 'text-red-700/70'}`}>
-                  Email: {store.email} | Users: {store._count.users} | Orders: {store._count.orders}
+                <div className={`text-xs mt-1 ${theme === 'dark' ? 'text-red-300/70' : 'text-red-700/70'}`}>
+                  {store.email}
+                </div>
+                <div className={`text-xs mt-1 flex gap-3 ${theme === 'dark' ? 'text-red-300/60' : 'text-red-600/70'}`}>
+                  <span>👤 {store._count.users} users</span>
+                  <span>🧾 {store._count.orders} orders</span>
+                  <span>📦 {store._count.inventory} inventory</span>
+                  <span>📢 {store._count.adverts} adverts</span>
                 </div>
               </div>
             ))}
           </div>
+          <button
+            onClick={handleCleanupTestAccounts}
+            disabled={loading}
+            className={`mt-4 w-full p-4 rounded-lg font-semibold transition ${
+              theme === 'dark'
+                ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white'
+                : 'bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white'
+            }`}
+          >
+            {loading ? '🔄 Deleting...' : `🗑️ Delete All ${testStores.length} Test Store(s) + All Data`}
+          </button>
         </div>
       )}
 
