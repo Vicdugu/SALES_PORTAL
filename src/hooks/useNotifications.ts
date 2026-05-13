@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useNotificationStore, Notification } from '@/store/notificationStore';
-import { useNotificationSound } from './useNotificationSound';
+import { useNotificationSound, warmAudio } from './useNotificationSound';
 import { apiCall } from '@/lib/api/client';
 
 interface SSEMessage {
@@ -39,7 +39,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     clearAll,
   } = useNotificationStore();
 
-  const { play, initAudio } = useNotificationSound();
+  const { play } = useNotificationSound();
   const sseRef = useRef<EventSource | null>(null);
   const mountedRef = useRef(true);
 
@@ -102,24 +102,46 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Initialise AudioContext (unblocks mobile after first interaction)
-    const onInteraction = () => {
-      initAudio();
-      document.removeEventListener('click', onInteraction);
-      document.removeEventListener('touchstart', onInteraction);
-    };
+    // Warm AudioContext on first interaction so play() is synchronous when needed
+    const onInteraction = () => warmAudio().catch(() => {});
     document.addEventListener('click', onInteraction, { once: true });
     document.addEventListener('touchstart', onInteraction, { once: true });
 
     loadNotifications();
     connect();
 
+    // ── Polling fallback ─────────────────────────────────────────────────
+    // Vercel serverless instances don't share memory, so the in-memory
+    // broadcaster may not reach the SSE stream on a different instance.
+    // Poll every 10 s and surface any DB notifications not yet in the store.
+    const pollInterval = setInterval(async () => {
+      if (!mountedRef.current) return;
+      try {
+        const res = await apiCall('/api/notifications');
+        if (!res.ok) return;
+        const data = await res.json();
+        const items: Notification[] = data.data?.notifications ?? [];
+        const knownIds = new Set(
+          useNotificationStore.getState().notifications.map((n) => n.id)
+        );
+        items.forEach((n) => {
+          if (!knownIds.has(n.id)) {
+            addNotification({ ...n, createdAt: new Date(n.createdAt) });
+            if (!n.isRead && !muted) play(n.type, role);
+          }
+        });
+      } catch {
+        // Non-fatal
+      }
+    }, 10_000);
+
     return () => {
       mountedRef.current = false;
+      clearInterval(pollInterval);
       sseRef.current?.close();
       sseRef.current = null;
     };
-  }, [connect, initAudio, loadNotifications]);
+  }, [connect, loadNotifications, addNotification, muted, play, role]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const markAsRead = useCallback(

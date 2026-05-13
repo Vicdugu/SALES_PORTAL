@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Notification } from '@/store/notificationStore';
 
@@ -71,27 +72,41 @@ export function NotificationPanel({
 }: NotificationPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
+
+  useEffect(() => { setMounted(true); }, []);
 
   const { notifications, unreadCount, markAsRead, markAllRead, dismiss, clearRead } =
     useNotifications({ role: userRole, muted });
 
-  // Close panel when clicking outside
+  // Recalculate position when opening
+  const handleOpen = useCallback(() => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPanelPos({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setIsOpen((prev) => !prev);
+  }, [isOpen]);
+
+  // Close panel when clicking outside (both button and panel)
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      if (
+        buttonRef.current?.contains(e.target as Node) ||
+        panelRef.current?.contains(e.target as Node)
+      ) return;
+      setIsOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [isOpen]);
-
-  // Mark visible unread as read when opening panel
-  const handleOpen = useCallback(() => {
-    setIsOpen((prev) => !prev);
-  }, []);
 
   const filtered = notifications.filter(
     (n: Notification) => filter === 'all' || n.category === filter
@@ -100,9 +115,10 @@ export function NotificationPanel({
   const filteredUnread = filtered.filter((n: Notification) => !n.isRead).length;
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative">
       {/* ── Bell button ─────────────────────────────────────────────────── */}
       <button
+        ref={buttonRef}
         onClick={handleOpen}
         className={`relative p-2 rounded-lg transition border font-bold ${buttonClass}`}
         title="Notifications"
@@ -116,11 +132,18 @@ export function NotificationPanel({
         )}
       </button>
 
-      {/* ── Panel ────────────────────────────────────────────────────────── */}
-      {isOpen && (
+      {/* ── Panel — rendered via Portal so it escapes parent stacking contexts ── */}
+      {isOpen && mounted && createPortal(
         <div
-          className="fixed right-2 top-16 z-[200] w-[340px] max-w-[calc(100vw-1rem)] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden"
-          style={{ maxHeight: 'calc(100vh - 80px)' }}
+          ref={panelRef}
+          style={{
+            position: 'fixed',
+            top: panelPos.top,
+            right: panelPos.right,
+            zIndex: 9999,
+            maxHeight: 'calc(100vh - 80px)',
+          }}
+          className="w-[340px] max-w-[calc(100vw-1rem)] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
@@ -192,7 +215,8 @@ export function NotificationPanel({
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

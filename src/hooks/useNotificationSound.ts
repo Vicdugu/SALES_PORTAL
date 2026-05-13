@@ -4,65 +4,80 @@
  * useNotificationSound — generates UI sounds via Web Audio API.
  * No external audio files needed. Works on desktop + mobile.
  *
- * Mobile note: AudioContext requires a user interaction before it can produce
- * audio. This hook initialises the context lazily on first user interaction,
- * then plays sounds freely after that.
+ * Design:
+ * - AudioContext is created and resumed eagerly on first user interaction.
+ * - `play()` is fully synchronous — no async/await, no setTimeout.
+ * - Multi-tone sequences use Web Audio's `ctx.currentTime + offset` scheduling,
+ *   which is sample-accurate and adds zero OS-level jitter.
+ * - A silent buffer is played on init to keep iOS from suspending the context.
  */
 
-let audioCtx: AudioContext | null = null;
+type AudioContextCtor = typeof AudioContext;
 
-async function getCtx(): Promise<AudioContext | null> {
-  if (typeof window === 'undefined') return null;
-  if (!audioCtx) {
-    try {
-      audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    } catch {
-      return null;
-    }
+let _ctx: AudioContext | null = null;
+let _ctxReady = false;
+
+/** Eagerly warm the AudioContext. Called on first click/touchstart. */
+export async function warmAudio(): Promise<void> {
+  if (_ctxReady || typeof window === 'undefined') return;
+  try {
+    const Ctor: AudioContextCtor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: AudioContextCtor }).webkitAudioContext;
+    _ctx = new Ctor();
+    if (_ctx.state === 'suspended') await _ctx.resume();
+    // Play a 1-sample silent buffer — keeps iOS AudioContext alive
+    const silentBuf = _ctx.createBuffer(1, 1, _ctx.sampleRate);
+    const src = _ctx.createBufferSource();
+    src.buffer = silentBuf;
+    src.connect(_ctx.destination);
+    src.start(0);
+    _ctxReady = true;
+  } catch {
+    // Non-critical
   }
-  if (audioCtx.state === 'suspended') {
-    try {
-      await audioCtx.resume();
-    } catch {
-      return null;
-    }
-  }
-  return audioCtx;
 }
 
-/** Plays a single synthesised tone — ctx must already be running. */
+/** Synchronously returns the ready context, or null if not yet warmed. */
+function getCtx(): AudioContext | null {
+  return _ctxReady ? _ctx : null;
+}
+
+/**
+ * Schedule a single synthesised tone via Web Audio time offsets.
+ * startOffset is in SECONDS (Web Audio time, not ms) — zero-jitter.
+ */
 function tone(
   ctx: AudioContext,
   frequency: number,
   duration: number,
-  delayMs = 0,
+  startOffset = 0,
   waveform: OscillatorType = 'sine',
   volume = 0.22
 ) {
-  setTimeout(() => {
-    try {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = waveform;
-      osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-      gain.gain.setValueAtTime(volume, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + duration + 0.02);
-    } catch {
-      // Silent fail — audio is non-critical
-    }
-  }, delayMs);
+  try {
+    const t = ctx.currentTime + startOffset;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = waveform;
+    osc.frequency.setValueAtTime(frequency, t);
+    gain.gain.setValueAtTime(volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  } catch {
+    // Silent fail — audio is non-critical
+  }
 }
 
-/** Map of notification type → sound effect (ctx is already running). */
+/** Map of notification type → sound effect. Offsets are in seconds (Web Audio time). */
 const SOUNDS: Record<string, (ctx: AudioContext) => void> = {
   // New order (kitchen + cashier): ascending double chime C5 → E5
   ORDER_PENDING: (ctx) => {
     tone(ctx, 523, 0.18);
-    tone(ctx, 659, 0.22, 180);
+    tone(ctx, 659, 0.22, 0.18);
   },
 
   // Kitchen started order (cashier): soft single mid-low tone D4
@@ -73,8 +88,8 @@ const SOUNDS: Record<string, (ctx: AudioContext) => void> = {
   // Order ready for collection (cashier): triple ascending fanfare C5 → E5 → G5
   ORDER_READY: (ctx) => {
     tone(ctx, 523, 0.13);
-    tone(ctx, 659, 0.13, 130);
-    tone(ctx, 784, 0.22, 260);
+    tone(ctx, 659, 0.13, 0.13);
+    tone(ctx, 784, 0.22, 0.26);
   },
 
   // Order completed (admin): warm resolution tone G4
@@ -85,7 +100,7 @@ const SOUNDS: Record<string, (ctx: AudioContext) => void> = {
   // Payment error (cashier): descending warning square tones Eb4 → C4
   PAYMENT_ERROR: (ctx) => {
     tone(ctx, 311, 0.22, 0, 'square', 0.18);
-    tone(ctx, 261, 0.28, 220, 'square', 0.18);
+    tone(ctx, 261, 0.28, 0.22, 'square', 0.18);
   },
 
   // Low stock (admin): gentle bell A4
@@ -96,7 +111,7 @@ const SOUNDS: Record<string, (ctx: AudioContext) => void> = {
   // System alert (admin): two equal mid tones A4 → A4
   SYSTEM_ALERT: (ctx) => {
     tone(ctx, 440, 0.2);
-    tone(ctx, 440, 0.2, 250);
+    tone(ctx, 440, 0.2, 0.25);
   },
 };
 
@@ -117,20 +132,19 @@ const SOUND_ROLES: Record<string, string[]> = {
 export function useNotificationSound() {
   /** Initialise the AudioContext on first user interaction (required for mobile). */
   function initAudio() {
-    getCtx().catch(() => {});
+    warmAudio().catch(() => {});
   }
 
   /**
    * Play the sound for a given notification type.
-   * Awaits AudioContext.resume() before scheduling tones to avoid first-play delay.
-   * @param type  NotificationType string
-   * @param role  Current user's role — sound is skipped if not relevant to this role
+   * Fully synchronous — zero async overhead, sample-accurate scheduling.
+   * Silently no-ops if AudioContext hasn’t been warmed yet.
    */
-  async function play(type: string, role?: string) {
+  function play(type: string, role?: string) {
     if (role && SOUND_ROLES[type] && !SOUND_ROLES[type].includes(role)) return;
     const soundFn = SOUNDS[type];
     if (!soundFn) return;
-    const ctx = await getCtx();
+    const ctx = getCtx();
     if (!ctx) return;
     soundFn(ctx);
   }
