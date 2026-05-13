@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { useOrderStore } from '@/store/orderStore';
 import { useStore } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils/currency';
 
 interface PrintKitchenModalProps {
   staffName: string;
-  orderNumber: string; // Temporary reference number shown before DB write (e.g. timestamp-based)
+  orderNumber: string;
   onPrint: () => void;
   onSkip: () => void;
 }
@@ -15,13 +14,9 @@ interface PrintKitchenModalProps {
 /**
  * PrintKitchenModal
  *
- * Shown when `enable_print_before_kitchen` is active.
- * Presents a thermal-printer-friendly order slip preview.
- * "Print Order" → window.print() then calls onPrint
- * "Skip"         → calls onSkip (no print)
- *
- * CSS: a hidden #print-slip div is rendered; @media print hides
- * everything except that div.
+ * Opens a dedicated popup window containing only the kitchen slip,
+ * then calls window.print() on that window. This avoids any CSS
+ * conflicts with the main page.
  */
 export function PrintKitchenModal({
   staffName,
@@ -31,90 +26,90 @@ export function PrintKitchenModal({
 }: PrintKitchenModalProps) {
   const { items, total } = useOrderStore();
   const store = useStore();
-  const printRef = useRef<HTMLDivElement>(null);
-
-  // Inject print-only CSS once
-  useEffect(() => {
-    const styleId = 'print-kitchen-slip-style';
-    if (document.getElementById(styleId)) return;
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = `
-      @media print {
-        body * { visibility: hidden !important; }
-        #print-kitchen-slip,
-        #print-kitchen-slip * { visibility: visible !important; }
-        #print-kitchen-slip {
-          position: fixed !important;
-          top: 0; left: 0;
-          width: 80mm;
-          padding: 4mm;
-          font-family: monospace;
-          font-size: 12px;
-          line-height: 1.4;
-          color: #000;
-          background: #fff;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      const el = document.getElementById(styleId);
-      if (el) el.remove();
-    };
-  }, []);
-
-  const handlePrint = () => {
-    window.print();
-    onPrint();
-  };
 
   const now = new Date();
   const timestamp = now.toLocaleString();
 
+  const handlePrint = () => {
+    const storeName = store?.name || 'Kitchen Order';
+    const currency = store?.currency;
+
+    const itemRows = items
+      .map(
+        (item) => `
+        <div class="item">
+          <span class="qty">${item.quantity}x</span>
+          <span class="name">${item.name}</span>
+          ${item.notes ? `<div class="notes">Note: ${item.notes}</div>` : ''}
+        </div>`
+      )
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Kitchen Slip</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #000;
+      width: 80mm;
+      padding: 6mm 4mm;
+    }
+    .center { text-align: center; }
+    .right { text-align: right; }
+    .bold { font-weight: bold; }
+    .divider { border-top: 1px dashed #000; margin: 4mm 0; }
+    .store-name { font-size: 15px; font-weight: bold; }
+    .slip-title { font-size: 12px; letter-spacing: 2px; margin-top: 1mm; }
+    .meta { margin-bottom: 2mm; }
+    .item { margin: 2mm 0; }
+    .item .qty { font-weight: bold; margin-right: 2mm; }
+    .item .notes { padding-left: 6mm; font-style: italic; font-size: 11px; }
+    .total { font-size: 14px; font-weight: bold; }
+    .footer { font-size: 10px; margin-top: 2mm; }
+  </style>
+</head>
+<body>
+  <div class="center">
+    <div class="store-name">${storeName}</div>
+    <div class="slip-title">KITCHEN SLIP</div>
+  </div>
+  <div class="divider"></div>
+  <div class="meta"><span class="bold">Order Ref:</span> ${orderNumber}</div>
+  <div class="meta"><span class="bold">Staff:</span> ${staffName}</div>
+  <div class="meta"><span class="bold">Time:</span> ${timestamp}</div>
+  <div class="divider"></div>
+  <div class="bold" style="margin-bottom:2mm;">ITEMS</div>
+  ${itemRows}
+  <div class="divider"></div>
+  <div class="right total">TOTAL: ${formatCurrency(total, currency)}</div>
+  <div class="divider"></div>
+  <div class="center footer">— Kitchen Copy —</div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=350,height=600,toolbar=0,menubar=0,scrollbars=0');
+    if (!win) {
+      // Popup blocked — fall back to calling onPrint so payment isn't stuck
+      onPrint();
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+    // Close the popup after a short delay (gives print dialog time to open)
+    setTimeout(() => { try { win.close(); } catch { /* ignore */ } }, 1000);
+    onPrint();
+  };
+
   return (
-    <>
-      {/* ── Hidden print-only slip ───────────────────────────── */}
-      <div id="print-kitchen-slip" ref={printRef} style={{ display: 'none' }}>
-        <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '4mm', marginBottom: '4mm' }}>
-          <strong style={{ fontSize: '14px' }}>{store?.name || 'Kitchen Order'}</strong>
-          <br />
-          <span>KITCHEN SLIP</span>
-        </div>
-
-        <div style={{ marginBottom: '4mm' }}>
-          <strong>Order Ref:</strong> {orderNumber}
-          <br />
-          <strong>Staff:</strong> {staffName}
-          <br />
-          <strong>Time:</strong> {timestamp}
-        </div>
-
-        <div style={{ borderTop: '1px dashed #000', paddingTop: '4mm', marginBottom: '4mm' }}>
-          <strong>ITEMS</strong>
-          {items.map((item, idx) => (
-            <div key={idx} style={{ marginTop: '2mm' }}>
-              <span>{item.quantity}x {item.name}</span>
-              {item.notes && (
-                <div style={{ paddingLeft: '4mm', fontStyle: 'italic', fontSize: '11px' }}>
-                  Note: {item.notes}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div style={{ borderTop: '1px dashed #000', paddingTop: '4mm', textAlign: 'right' }}>
-          <strong>TOTAL: {formatCurrency(total, store?.currency)}</strong>
-        </div>
-
-        <div style={{ marginTop: '4mm', textAlign: 'center', fontSize: '10px', borderTop: '1px dashed #000', paddingTop: '2mm' }}>
-          — Kitchen Copy —
-        </div>
-      </div>
-
-      {/* ── Visible modal overlay ────────────────────────────── */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
         <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-5 text-white">
@@ -178,6 +173,5 @@ export function PrintKitchenModal({
           </div>
         </div>
       </div>
-    </>
   );
 }
