@@ -15,10 +15,11 @@ import { CompletedTransactions } from '@/components/till/CompletedTransactions';
 import { AdvertPanel } from '@/components/AdvertPanel';
 import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
 import { NotificationPanel } from '@/components/NotificationPanel';
+import { FeatureManagement } from '@/components/admin/FeatureManagement';
 
 export const dynamic = 'force-dynamic';
 
-type AdminTab = 'analytics' | 'staff' | 'inventory' | 'settings' | 'completed' | 'cleanup' | 'transactions' | 'approvals';
+type AdminTab = 'analytics' | 'staff' | 'inventory' | 'settings' | 'completed' | 'cleanup' | 'transactions' | 'approvals' | 'features';
 
 export default function AdminPage() {
   const { user, store, isLoading } = useAuth();
@@ -264,6 +265,16 @@ export default function AdminPage() {
                 >
                   🧹 Cleanup
                 </button>
+                <button
+                  onClick={() => handleTabChange('features')}
+                  className={`px-3 py-2 rounded text-sm font-bold whitespace-nowrap transition-colors ${
+                    activeTab === 'features'
+                      ? `${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-900'}`
+                      : `${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
+                  }`}
+                >
+                  🚩 Features
+                </button>
               </>
             )}
           </div>
@@ -363,6 +374,17 @@ export default function AdminPage() {
                     className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
                   >
                     🧹 System Cleanup
+                  </button>
+                  <button
+                    onClick={() => handleTabChange('features')}
+                    style={{
+                      borderLeftColor: activeTab === 'features' ? primaryColor : 'transparent',
+                      color: activeTab === 'features' ? primaryColor : (theme === 'dark' ? '#E5E7EB' : '#1F2937'),
+                      backgroundColor: activeTab === 'features' ? (theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent',
+                    }}
+                    className="py-4 px-4 border-l-4 font-bold transition-colors duration-150 hover:bg-gray-200 dark:hover:bg-gray-800 will-change-colors text-left rounded-l"
+                  >
+                    🚩 Feature Flags
                   </button>
                 </>
               )}
@@ -468,6 +490,11 @@ export default function AdminPage() {
 
           {/* Transaction History Tab */}
           {activeTab === 'transactions' && user.role === 'SUPERADMIN' && <TransactionHistory />}
+
+          {/* Feature Flags Tab */}
+          {activeTab === 'features' && user.role === 'SUPERADMIN' && (
+            <FeatureManagement theme={theme} />
+          )}
           </div>
 
           {/* Advert Panel Sidebar - Right Side (Desktop only) */}

@@ -18,6 +18,7 @@ interface Order {
   items: OrderItem[];
   notes?: string;
   createdAt: string;
+  printedForKitchen?: boolean;
   staff?: {
     name: string;
     email: string;
@@ -176,15 +177,22 @@ function OrderCard({ order, onStatusUpdate }: OrderCardProps) {
           <h3 className="text-lg font-bold">{order.orderNumber}</h3>
           <p className="text-xs text-gray-600">{order.staff?.name || 'Unknown Cashier'}</p>
         </div>
-        <span
-          className={`px-3 py-1 rounded-full text-sm font-semibold ${
-            order.status === 'PENDING'
-              ? 'bg-red-100 text-red-800 animate-pulse'
-              : 'bg-yellow-100 text-yellow-800'
-          }`}
-        >
-          {order.status}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-semibold ${
+              order.status === 'PENDING'
+                ? 'bg-red-100 text-red-800 animate-pulse'
+                : 'bg-yellow-100 text-yellow-800'
+            }`}
+          >
+            {order.status}
+          </span>
+          {order.printedForKitchen && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 border border-orange-300">
+              🖨️ Manual Print
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Items */}

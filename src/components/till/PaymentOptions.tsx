@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiCall } from '@/lib/api/client';
 import { useOrderStore } from '@/store/orderStore';
-import { useStore } from '@/contexts/AuthContext';
+import { useStore, useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils/currency';
 import { ReceiptModal } from './ReceiptModal';
+import { PrintKitchenModal } from './PrintKitchenModal';
 
 export type PaymentMethod = 'CASH' | 'TRANSFER' | 'POS';
 
@@ -45,6 +46,12 @@ export function PaymentOptions({
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<{ id: string; orderNumber: string } | null>(null);
 
+  // Print-before-kitchen feature flag
+  const [printBeforeKitchen, setPrintBeforeKitchen] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [pendingPrintedForKitchen, setPendingPrintedForKitchen] = useState<boolean | null>(null);
+  const { user } = useAuth();
+
   // ── Single payment ──────────────────────────────────────────────────────
   const [singleMethod, setSingleMethod] = useState<PaymentMethod | null>(null);
 
@@ -62,6 +69,18 @@ export function PaymentOptions({
 
   const { items, total, clearCart } = useOrderStore();
   const store = useStore();
+
+  // Fetch feature flags once on mount
+  useEffect(() => {
+    apiCall('/api/features')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.data?.features?.enable_print_before_kitchen) {
+          setPrintBeforeKitchen(true);
+        }
+      })
+      .catch(() => { /* non-fatal */ });
+  }, []);
 
   const paymentMethods: Array<{ id: PaymentMethod; label: string; icon: string }> = [
     { id: 'CASH', label: 'Cash', icon: '💰' },
@@ -132,7 +151,42 @@ export function PaymentOptions({
   };
 
   // ── Payment processing ───────────────────────────────────────────────────
+
+  /**
+   * Called by the print modal after user chooses Print or Skip.
+   * Continues payment with the recorded printedForKitchen flag.
+   */
+  const continuePayment = async (printedForKitchen: boolean) => {
+    setShowPrintModal(false);
+    setPendingPrintedForKitchen(null);
+    await executePayment(printedForKitchen);
+  };
+
   const handlePayNow = async () => {
+    // If print-before-kitchen is enabled, show print modal first
+    if (printBeforeKitchen && !showPrintModal) {
+      // Validate selections before showing print modal
+      if (splitPayment && receiptOption === 'email') {
+        if (!receiptEmail.trim()) {
+          setEmailError("Please enter the customer's email address");
+          return;
+        }
+        if (!validateEmail(receiptEmail.trim())) {
+          setEmailError('Please enter a valid email address');
+          return;
+        }
+      }
+      if (!splitPayment && !singleMethod) {
+        setError('Please select a payment method');
+        return;
+      }
+      setShowPrintModal(true);
+      return;
+    }
+    await executePayment(false);
+  };
+
+  const executePayment = async (printedForKitchen: boolean) => {
     if (splitPayment && receiptOption === 'email') {
       if (!receiptEmail.trim()) {
         setEmailError("Please enter the customer's email address");
@@ -170,6 +224,7 @@ export function PaymentOptions({
           })),
           payments,
           notes: '',
+          printedForKitchen,
         }),
       });
 
@@ -587,10 +642,22 @@ export function PaymentOptions({
     </div>
   );
 
+  // Temporary order reference shown in the print slip (before DB order number)
+  const printOrderRef = `#${Date.now().toString().slice(-6)}`;
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      {!splitPayment ? singlePaymentUI : splitPaymentUI}
+      {showPrintModal && (
+        <PrintKitchenModal
+          staffName={user?.name || 'Staff'}
+          orderNumber={printOrderRef}
+          onPrint={() => continuePayment(true)}
+          onSkip={() => continuePayment(false)}
+        />
+      )}
+
+      {!showPrintModal && (!splitPayment ? singlePaymentUI : splitPaymentUI)}
 
       {completedOrder && (
         <ReceiptModal

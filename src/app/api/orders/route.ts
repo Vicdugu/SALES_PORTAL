@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { items, notes, paymentMethod, payments } = body;
+    const { items, notes, paymentMethod, payments, printedForKitchen } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json(
@@ -192,6 +192,7 @@ export async function POST(request: NextRequest) {
         total,
         notes,
         paymentMethod: paymentMethod || (payments?.[0]?.method),
+        printedForKitchen: printedForKitchen === true,
         // Create payment records for split payments
         payments: payments && Array.isArray(payments) ? {
           createMany: {

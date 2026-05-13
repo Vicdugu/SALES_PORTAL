@@ -44,6 +44,7 @@ model Store {
   notifications Notification[]
   auditLogs AuditLog[]
   adverts   Advert[]
+  features  StoreFeature[]
   
   @@index([email])
 }
@@ -115,6 +116,7 @@ model Order {
   
   paymentMethod String? // Kept for backward compatibility
   notes     String?
+  printedForKitchen Boolean @default(false) // set when cashier manually prints order slip
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -307,5 +309,21 @@ model Advert {
   @@index([storeId])
   @@index([isActive])
   @@index([order])
+}
+
+// ===== FEATURE FLAGS =====
+model StoreFeature {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  flagKey   String   // e.g. "enable_print_before_kitchen", "enable_split_payment"
+  enabled   Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, flagKey])
+  @@index([storeId])
 }
 
