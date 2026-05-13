@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
-import { verifyToken } from '@/lib/auth/jwt';
+import { verifyToken, getTokenFromHeader } from '@/lib/auth/jwt';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { createNotification, NotificationType } from '@/lib/notifications/service';
 
+/** Extract the authenticated userId from the request, or return null. */
+function getUserId(request: NextRequest): string | null {
+  const token = getTokenFromHeader(request.headers.get('Authorization'));
+  if (!token) return null;
+  return verifyToken(token)?.userId ?? null;
+}
+
 /**
  * GET /api/notifications
- * Returns all unread + last 20 read notifications for the current store.
- * Requires a valid JWT in Authorization header.
+ * Returns notifications for the current store that this user has NOT dismissed.
+ * Unread = no NotificationRead row for this user.
+ * Read   = NotificationRead row exists with no dismissedAt.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -16,25 +24,50 @@ export async function GET(request: NextRequest) {
     if (!storeId) {
       return NextResponse.json(errorResponse('UNAUTHORIZED', 'Store ID not found'), { status: 401 });
     }
+    const userId = getUserId(request);
+    if (!userId) {
+      return NextResponse.json(errorResponse('UNAUTHORIZED', 'Missing token'), { status: 401 });
+    }
 
-    const [unread, recent] = await Promise.all([
-      prisma.notification.findMany({
-        where: { storeId, isRead: false },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.notification.findMany({
-        where: { storeId, isRead: true },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      }),
-    ]);
+    // Fetch recent notifications for this store (last 60 to keep response small)
+    const allNotifications = await prisma.notification.findMany({
+      where: { storeId },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+      include: {
+        reads: {
+          where: { userId },
+          select: { readAt: true, dismissedAt: true },
+        },
+      },
+    });
 
-    const notifications = [...unread, ...recent];
+    // Attach per-user isRead / filter out dismissed ones
+    const visible = allNotifications
+      .filter((n) => {
+        const userRead = n.reads[0];
+        return !userRead?.dismissedAt; // hide dismissed
+      })
+      .map((n) => {
+        const userRead = n.reads[0];
+        return {
+          id: n.id,
+          storeId: n.storeId,
+          type: n.type,
+          title: n.title,
+          message: n.message,
+          link: n.link,
+          category: n.category,
+          createdAt: n.createdAt,
+          isRead: !!userRead,
+          readAt: userRead?.readAt ?? null,
+        };
+      });
 
     return NextResponse.json(
       successResponse({
-        notifications,
-        unreadCount: unread.length,
+        notifications: visible,
+        unreadCount: visible.filter((n) => !n.isRead).length,
       })
     );
   } catch (error) {
@@ -45,19 +78,13 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/notifications
- * Creates a notification. Used by client-side for PAYMENT_ERROR events.
- * Requires authenticated user (any role).
+ * Creates a notification (used client-side for PAYMENT_ERROR).
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const userId = getUserId(request);
+    if (!userId) {
       return NextResponse.json(errorResponse('UNAUTHORIZED', 'Missing token'), { status: 401 });
-    }
-    const token = authHeader.slice(7);
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json(errorResponse('UNAUTHORIZED', 'Invalid token'), { status: 401 });
     }
 
     const storeId = await getStoreId();
@@ -91,7 +118,8 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/notifications
- * Clears all read notifications for the current store.
+ * Dismisses all read notifications for THIS user only.
+ * Other users' views are unaffected.
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -99,9 +127,31 @@ export async function DELETE(request: NextRequest) {
     if (!storeId) {
       return NextResponse.json(errorResponse('UNAUTHORIZED', 'Store ID not found'), { status: 401 });
     }
+    const userId = getUserId(request);
+    if (!userId) {
+      return NextResponse.json(errorResponse('UNAUTHORIZED', 'Missing token'), { status: 401 });
+    }
 
-    const { count } = await prisma.notification.deleteMany({
-      where: { storeId, isRead: true },
+    const now = new Date();
+
+    // Get all notifications in this store
+    const storeNotificationIds = await prisma.notification
+      .findMany({ where: { storeId }, select: { id: true } })
+      .then((rows) => rows.map((r) => r.id));
+
+    if (storeNotificationIds.length === 0) {
+      return NextResponse.json(successResponse({ cleared: 0 }));
+    }
+
+    // Dismiss all that this user has already read (NotificationRead row exists, no dismissedAt yet)
+    const { count } = await (prisma as unknown as { notificationRead: { updateMany: (args: unknown) => Promise<{ count: number }> } }).notificationRead.updateMany({
+      where: {
+        userId,
+        notificationId: { in: storeNotificationIds },
+        dismissedAt: null,
+        readAt: { not: undefined },
+      },
+      data: { dismissedAt: now },
     });
 
     return NextResponse.json(successResponse({ cleared: count }));
@@ -110,3 +160,5 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json(errorResponse('INTERNAL_ERROR', 'Failed to clear notifications'), { status: 500 });
   }
 }
+
+

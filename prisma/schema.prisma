@@ -217,13 +217,28 @@ model Notification {
   link      String?                       // Optional navigation URL
   category  String   @default("order")   // "order"|"inventory"|"payment"|"system"
 
-  isRead    Boolean  @default(false)
-
   createdAt DateTime @default(now())
-  readAt    DateTime?
+
+  reads     NotificationRead[]
   
   @@index([storeId])
-  @@index([isRead])
+  @@index([createdAt])
+}
+
+/// Per-user read/dismissed state for a notification.
+/// One row per (user, notification) pair — absent = unread, present = read, dismissedAt set = hidden.
+model NotificationRead {
+  id             String    @id @default(cuid())
+  userId         String
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  readAt         DateTime  @default(now())
+  dismissedAt    DateTime?              // set when user dismisses/clears
+
+  @@unique([userId, notificationId])
+  @@index([userId])
+  @@index([notificationId])
 }
 
 enum NotificationType {
