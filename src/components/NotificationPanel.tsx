@@ -223,6 +223,8 @@ export function NotificationPanel({
 }
 
 // ─── Single row ───────────────────────────────────────────────────────────────
+// Clicking the row marks it as read for this user only — no navigation.
+// Dismiss (×) hides it from this user only.
 function NotificationRow({
   notification: n,
   onRead,
@@ -232,10 +234,21 @@ function NotificationRow({
   onRead: (id: string) => void;
   onDismiss: (id: string) => void;
 }) {
+  const handleRowClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('[data-dismiss]')) return;
+    if (!n.isRead) onRead(n.id);
+  };
+
   return (
     <div
-      className={`relative px-4 py-3 flex gap-3 group transition ${
-        n.isRead ? 'bg-white dark:bg-gray-900' : 'bg-blue-50 dark:bg-blue-950/30'
+      role="button"
+      tabIndex={0}
+      onClick={handleRowClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleRowClick(e as unknown as React.MouseEvent); }}
+      className={`relative px-4 py-3 flex gap-3 group transition cursor-pointer ${
+        n.isRead
+          ? 'bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800'
+          : 'bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50'
       }`}
     >
       {/* Unread dot */}
@@ -262,7 +275,6 @@ function NotificationRow({
         </p>
 
         <div className="flex items-center gap-2 mt-1.5">
-          {/* Category tag */}
           <span
             className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
               CATEGORY_COLOR[n.category] ?? 'bg-gray-100 text-gray-600'
@@ -270,33 +282,16 @@ function NotificationRow({
           >
             {TYPE_LABEL[n.type] ?? n.type}
           </span>
-
-          {/* Navigation link */}
-          {n.link && (
-            <a
-              href={n.link}
-              className="text-[10px] text-blue-600 hover:underline font-semibold"
-              onClick={() => onRead(n.id)}
-            >
-              View →
-            </a>
-          )}
-
-          {/* Mark read */}
           {!n.isRead && (
-            <button
-              onClick={() => onRead(n.id)}
-              className="text-[10px] text-blue-500 hover:text-blue-700 font-semibold"
-            >
-              Mark read
-            </button>
+            <span className="text-[10px] text-blue-400 italic">tap to mark read</span>
           )}
         </div>
       </div>
 
-      {/* Dismiss */}
+      {/* Dismiss — data-dismiss prevents row click from firing */}
       <button
-        onClick={() => onDismiss(n.id)}
+        data-dismiss="true"
+        onClick={(e) => { e.stopPropagation(); onDismiss(n.id); }}
         className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-gray-600 flex-shrink-0 text-base leading-none mt-0.5 p-0.5 rounded"
         title="Dismiss"
         aria-label="Dismiss notification"
