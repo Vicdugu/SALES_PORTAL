@@ -66,7 +66,12 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const connect = useCallback(() => {
     if (sseRef.current?.readyState === EventSource.OPEN) return;
 
-    const es = new EventSource('/api/notifications/stream', { withCredentials: true });
+    const storeId =
+      typeof window !== 'undefined' ? localStorage.getItem('storeId') : null;
+    const streamUrl = storeId
+      ? `/api/notifications/stream?storeId=${encodeURIComponent(storeId)}`
+      : '/api/notifications/stream';
+    const es = new EventSource(streamUrl, { withCredentials: true });
     sseRef.current = es;
 
     es.addEventListener('message', (event) => {
@@ -102,10 +107,13 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Warm AudioContext on first interaction so play() is synchronous when needed
+    // Re-warm AudioContext on every interaction so it never stays suspended.
+    // { once: true } caused issues: after ~60s browser auto-suspends the context
+    // and the next SSE sound arrives in a non-gesture callback — browsers block
+    // resume() there. Re-warming on every click keeps the context alive.
     const onInteraction = () => warmAudio().catch(() => {});
-    document.addEventListener('click', onInteraction, { once: true });
-    document.addEventListener('touchstart', onInteraction, { once: true });
+    document.addEventListener('click', onInteraction);
+    document.addEventListener('touchstart', onInteraction);
 
     loadNotifications();
     connect();
@@ -138,6 +146,8 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     return () => {
       mountedRef.current = false;
       clearInterval(pollInterval);
+      document.removeEventListener('click', onInteraction);
+      document.removeEventListener('touchstart', onInteraction);
       sseRef.current?.close();
       sseRef.current = null;
     };

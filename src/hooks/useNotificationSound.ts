@@ -47,15 +47,17 @@ export async function warmAudio(): Promise<void> {
 }
 
 /**
- * Schedule a single tone at ctx.currentTime + startOffset (seconds).
+ * Schedule a single tone at ctx.currentTime + startOffset.
+ * Fades in over `fadeIn` seconds then decays to silence by `duration`.
  */
 function tone(
   ctx: AudioContext,
   frequency: number,
   duration: number,
   startOffset = 0,
-  waveform: OscillatorType = 'sine',
-  volume = 0.25
+  waveform: OscillatorType = 'triangle',
+  volume = 0.75,
+  fadeIn = 0.06
 ) {
   try {
     const t = ctx.currentTime + startOffset;
@@ -65,7 +67,10 @@ function tone(
     gain.connect(ctx.destination);
     osc.type = waveform;
     osc.frequency.setValueAtTime(frequency, t);
-    gain.gain.setValueAtTime(volume, t);
+    // Fade in
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(volume, t + fadeIn);
+    // Decay to silence
     gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
     osc.start(t);
     osc.stop(t + duration + 0.05);
@@ -74,15 +79,44 @@ function tone(
   }
 }
 
-/** Map of notification type -> sound. Offsets are in seconds. */
+/** All sounds last ~2 seconds with a gentle fade-in. */
 const SOUNDS: Record<string, (ctx: AudioContext) => void> = {
-  ORDER_PENDING:     (ctx) => { tone(ctx, 523, 0.18); tone(ctx, 659, 0.22, 0.18); },
-  ORDER_IN_PROGRESS: (ctx) => { tone(ctx, 294, 0.28); },
-  ORDER_READY:       (ctx) => { tone(ctx, 523, 0.13); tone(ctx, 659, 0.13, 0.13); tone(ctx, 784, 0.22, 0.26); },
-  ORDER_COMPLETED:   (ctx) => { tone(ctx, 392, 0.25); },
-  PAYMENT_ERROR:     (ctx) => { tone(ctx, 311, 0.22, 0, 'square', 0.2); tone(ctx, 261, 0.28, 0.22, 'square', 0.2); },
-  LOW_STOCK:         (ctx) => { tone(ctx, 440, 0.38); },
-  SYSTEM_ALERT:      (ctx) => { tone(ctx, 440, 0.2); tone(ctx, 440, 0.2, 0.25); },
+  // New order — bold two-tone ding
+  ORDER_PENDING: (ctx) => {
+    tone(ctx, 880, 1.0, 0.0, 'triangle', 0.8);
+    tone(ctx, 1046, 1.2, 0.85, 'triangle', 0.8);
+  },
+  // Kitchen started — mid tone
+  ORDER_IN_PROGRESS: (ctx) => {
+    tone(ctx, 660, 2.0, 0.0, 'triangle', 0.7);
+  },
+  // Order ready — rising three-note chime
+  ORDER_READY: (ctx) => {
+    tone(ctx, 784, 0.7, 0.0,  'triangle', 0.8);
+    tone(ctx, 988, 0.7, 0.65, 'triangle', 0.8);
+    tone(ctx, 1175, 1.0, 1.25, 'triangle', 0.85);
+  },
+  // Completed — two descending notes
+  ORDER_COMPLETED: (ctx) => {
+    tone(ctx, 784, 1.0, 0.0,  'triangle', 0.7);
+    tone(ctx, 523, 1.2, 0.9,  'triangle', 0.7);
+  },
+  // Payment error — harsh square buzz
+  PAYMENT_ERROR: (ctx) => {
+    tone(ctx, 220, 0.9, 0.0,  'square', 0.7);
+    tone(ctx, 185, 1.1, 0.95, 'square', 0.7);
+  },
+  // Low stock — insistent double pulse
+  LOW_STOCK: (ctx) => {
+    tone(ctx, 880, 0.7, 0.0,  'triangle', 0.75);
+    tone(ctx, 880, 0.9, 0.85, 'triangle', 0.75);
+  },
+  // System alert — triple pulse
+  SYSTEM_ALERT: (ctx) => {
+    tone(ctx, 880, 0.5, 0.0,  'triangle', 0.75);
+    tone(ctx, 880, 0.5, 0.6,  'triangle', 0.75);
+    tone(ctx, 880, 0.7, 1.2,  'triangle', 0.75);
+  },
 };
 
 const SOUND_ROLES: Record<string, string[]> = {

@@ -10,8 +10,11 @@ export const maxDuration = 60;
  * Server-Sent Events endpoint for real-time notification delivery.
  * Streams new notification events to all connected clients of the same store.
  */
-export async function GET(_request: NextRequest) {
-  const storeId = await getStoreId();
+export async function GET(request: NextRequest) {
+  // EventSource cannot send custom headers, so storeId is passed as a query param.
+  // Fall back to header/cookie via getStoreId() for server-side callers.
+  const storeId =
+    request.nextUrl.searchParams.get('storeId') || (await getStoreId());
   if (!storeId) {
     return new Response('Unauthorized - No store ID', { status: 401 });
   }
