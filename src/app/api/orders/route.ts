@@ -4,6 +4,7 @@ import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { getUserId } from '@/lib/tenancy/get-user-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { orderBroadcaster } from '@/lib/realtime/OrderBroadcaster';
+import { createNotification } from '@/lib/notifications/service';
 
 /**
  * GET /api/orders - Get orders for a store
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
 
     // Update inventory quantities and create usage records
     for (const update of inventoryUpdates) {
-      await prisma.inventoryItem.update({
+      const afterUpdate = await prisma.inventoryItem.update({
         where: { id: update.inventoryItemId },
         data: {
           quantity: {
@@ -234,6 +235,17 @@ export async function POST(request: NextRequest) {
           reason: 'ORDER',
         },
       });
+
+      // Notify admin if stock dropped below minimum
+      if (afterUpdate.quantity < afterUpdate.minimumStock) {
+        await createNotification({
+          storeId,
+          type: 'LOW_STOCK',
+          title: `Low Stock — ${afterUpdate.name}`,
+          message: `Only ${afterUpdate.quantity} ${afterUpdate.unit} remaining (minimum: ${afterUpdate.minimumStock}).`,
+          link: '/admin',
+        });
+      }
     }
 
     // Broadcast order create event to all admin dashboards
@@ -248,6 +260,15 @@ export async function POST(request: NextRequest) {
         total: order.total,
         itemCount: order.items.length,
       },
+    });
+
+    // Notify kitchen + admin of the new pending order
+    await createNotification({
+      storeId,
+      type: 'ORDER_PENDING',
+      title: `New Order — ${order.orderNumber}`,
+      message: `${order.items.length} item(s) · Total: ${order.total.toFixed(2)}`,
+      link: '/kitchen',
     });
 
     return NextResponse.json(successResponse(order), { status: 201 });

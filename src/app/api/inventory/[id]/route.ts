@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { prisma } from '@/lib/db/client';
 import { errorResponse, successResponse } from '@/lib/utils/response';
+import { createNotification } from '@/lib/notifications/service';
 
 /**
  * PUT /api/inventory/[id] - Update inventory item (admin only)
@@ -69,6 +70,17 @@ export async function PUT(
     });
 
     console.log(`✓ Updated inventory item: ${updated.name}`);
+
+    // Notify admin if stock has dropped below minimum threshold
+    if (updated.quantity < updated.minimumStock) {
+      await createNotification({
+        storeId,
+        type: 'LOW_STOCK',
+        title: `Low Stock — ${updated.name}`,
+        message: `Only ${updated.quantity} ${updated.unit} remaining (minimum: ${updated.minimumStock}).`,
+        link: '/admin',
+      });
+    }
 
     return NextResponse.json(successResponse(updated));
   } catch (error) {

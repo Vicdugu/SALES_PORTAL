@@ -15,6 +15,7 @@ import { AdvertPanel } from '@/components/AdvertPanel';
 import { StoreCurrencyBadge } from '@/components/StoreCurrencyBadge';
 import { BrandingHeader } from '@/components/BrandingHeader';
 import { getCurrencySymbol } from '@/lib/utils/currency';
+import { NotificationPanel } from '@/components/NotificationPanel';
 
 type TabType = 'pos' | 'ready' | 'transactions';
 
@@ -168,6 +169,10 @@ export default function TillPage() {
                 <p className="text-xl sm:text-2xl font-bold text-green-700">{dailyCompletedCount}</p>
               </div>
               <StoreCurrencyBadge />
+              <NotificationPanel
+                userRole={user.role}
+                buttonClass="bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300"
+              />
               <button
                 onClick={() => router.push('/')}
                 className="px-2 sm:px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-xs sm:text-sm font-bold active:scale-95 transition-transform border border-gray-700"

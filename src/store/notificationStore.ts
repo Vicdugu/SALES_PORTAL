@@ -2,11 +2,13 @@ import { create } from 'zustand';
 
 export interface Notification {
   id: string;
-  type: 'LOW_STOCK' | 'ORDER_READY' | 'SYSTEM_ALERT' | 'PAYMENT_ERROR';
+  type: 'LOW_STOCK' | 'ORDER_READY' | 'ORDER_PENDING' | 'ORDER_IN_PROGRESS' | 'ORDER_COMPLETED' | 'SYSTEM_ALERT' | 'PAYMENT_ERROR';
   title: string;
   message: string;
+  link?: string | null;
+  category: string;
   isRead: boolean;
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 interface NotificationState {

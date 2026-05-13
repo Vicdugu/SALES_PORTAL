@@ -7,6 +7,7 @@ import { BrandingHeader } from '@/components/BrandingHeader';
 import { OrderQueue } from '@/components/kitchen/OrderQueue';
 import { CompletedTransactions } from '@/components/till/CompletedTransactions';
 import { AdvertPanel } from '@/components/AdvertPanel';
+import { NotificationPanel } from '@/components/NotificationPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +45,10 @@ export default function KitchenPage() {
             <div className="min-w-0">
               <p className="text-gray-900 text-xs sm:text-base font-semibold truncate">Staff: {user.name}</p>
             </div>
+            <NotificationPanel
+              userRole={user.role}
+              buttonClass="bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300"
+            />
             <button
               onClick={() => router.back()}
               className="px-3 sm:px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold text-xs sm:text-base active:scale-95 transition-transform border border-gray-900"

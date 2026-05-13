@@ -14,6 +14,7 @@ import { BrandingHeader } from '@/components/BrandingHeader';
 import { CompletedTransactions } from '@/components/till/CompletedTransactions';
 import { AdvertPanel } from '@/components/AdvertPanel';
 import { useBrandingUpdates } from '@/hooks/useBrandingUpdates';
+import { NotificationPanel } from '@/components/NotificationPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,6 +144,10 @@ export default function AdminPage() {
               </p>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+              <NotificationPanel
+                userRole={user.role}
+                buttonClass={theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700 text-yellow-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'}
+              />
               <button
                 onClick={toggleTheme}
                 className={`p-2 rounded-lg transition border font-bold ${

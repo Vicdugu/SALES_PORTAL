@@ -214,9 +214,11 @@ model Notification {
   type      NotificationType
   title     String
   message   String
-  
+  link      String?                       // Optional navigation URL
+  category  String   @default("order")   // "order"|"inventory"|"payment"|"system"
+
   isRead    Boolean  @default(false)
-  
+
   createdAt DateTime @default(now())
   readAt    DateTime?
   
@@ -227,6 +229,9 @@ model Notification {
 enum NotificationType {
   LOW_STOCK
   ORDER_READY
+  ORDER_PENDING
+  ORDER_IN_PROGRESS
+  ORDER_COMPLETED
   SYSTEM_ALERT
   PAYMENT_ERROR
 }

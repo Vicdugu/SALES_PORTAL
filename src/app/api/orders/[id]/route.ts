@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/client';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { orderBroadcaster } from '@/lib/realtime/OrderBroadcaster';
+import { createNotification } from '@/lib/notifications/service';
 
 /**
  * PATCH /api/orders/[id] - Update order status
@@ -76,6 +77,34 @@ export async function PATCH(
         completedAt: updateData.completedAt,
       },
     });
+
+    // Persist notification for relevant status changes
+    const orderNum = updatedOrder.orderNumber;
+    if (status === 'IN_PROGRESS') {
+      await createNotification({
+        storeId,
+        type: 'ORDER_IN_PROGRESS',
+        title: `Order In Progress — ${orderNum}`,
+        message: 'Kitchen has started preparing this order.',
+        link: '/till',
+      });
+    } else if (status === 'READY') {
+      await createNotification({
+        storeId,
+        type: 'ORDER_READY',
+        title: `Order Ready — ${orderNum}`,
+        message: 'Order is ready for collection at the counter.',
+        link: '/till',
+      });
+    } else if (status === 'COMPLETED') {
+      await createNotification({
+        storeId,
+        type: 'ORDER_COMPLETED',
+        title: `Order Completed — ${orderNum}`,
+        message: 'Order has been collected and marked complete.',
+        link: '/admin',
+      });
+    }
 
     return NextResponse.json(successResponse(updatedOrder));
   } catch (error) {
