@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { withTenantContext } from '@/lib/db/tenant-context';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { getUserId } from '@/lib/tenancy/get-user-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
@@ -29,23 +30,25 @@ export async function GET(request: NextRequest) {
       where.status = statusParam;
     }
 
-    const orders = await prisma.order.findMany({
-      where,
-      include: {
-        items: true,
-        staff: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    const orders = await withTenantContext(storeId, (tx) =>
+      tx.order.findMany({
+        where,
+        include: {
+          items: true,
+          staff: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-    });
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: limit,
+      })
+    );
 
     return NextResponse.json(successResponse(orders));
   } catch (error) {
