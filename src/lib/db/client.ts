@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { validateEnvironment } from '@/lib/utils/validate-env';
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | null };
 
@@ -9,9 +10,7 @@ export function getPrisma(): PrismaClient {
     return prismaInstance;
   }
 
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not set');
-  }
+  validateEnvironment();
 
   prismaInstance = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],

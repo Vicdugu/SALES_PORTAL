@@ -3,9 +3,20 @@ import { prisma } from '@/lib/db/client';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { hashPassword } from '@/lib/auth/hash';
 import { errorResponse, successResponse } from '@/lib/utils/response';
-import { jwtVerify } from 'jose';
+import { verifyToken } from '@/lib/auth/jwt';
+import { logSuperadminAccess } from '@/lib/auth/superadmin-audit';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
+function getPayload(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return verifyToken(authHeader.slice(7));
+  }
+  return null;
+}
+
+function getRole(request: NextRequest): string {
+  return getPayload(request)?.role ?? 'STAFF';
+}
 
 /**
  * GET /api/users - Get all users for a store
@@ -13,17 +24,7 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secr
 export async function GET(request: NextRequest) {
   try {
     // Get user role from JWT token
-    let userRole = 'STAFF';
-    const authHeader = request.headers.get('authorization');
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      try {
-        const verified = await jwtVerify(token, JWT_SECRET);
-        userRole = verified.payload.role as string;
-      } catch {
-        // Token verification failed, continue with default
-      }
-    }
+    const userRole = getRole(request);
 
     let storeId = await getStoreId();
     
@@ -32,6 +33,10 @@ export async function GET(request: NextRequest) {
       const storeIdParam = request.nextUrl.searchParams.get('storeId');
       if (storeIdParam) {
         storeId = storeIdParam;
+        const caller = getPayload(request);
+        if (caller?.userId) {
+          void logSuperadminAccess(caller.userId, storeIdParam, 'READ_USERS', { endpoint: '/api/users' });
+        }
       }
     }
 
@@ -88,21 +93,16 @@ export async function POST(request: NextRequest) {
     const { name, email, password, role, storeId: bodyStoreId } = body;
 
     // For superadmins, ALWAYS prefer bodyStoreId when provided
-    let userRole = 'STAFF';
+    let userRole = getRole(request);
     if (bodyStoreId) {
       // Verify the user is a superadmin by checking JWT token
       const authHeader = request.headers.get('authorization');
-      if (authHeader) {
-        const token = authHeader.replace('Bearer ', '');
-        try {
-          const verified = await jwtVerify(token, JWT_SECRET);
-          userRole = verified.payload.role as string;
-          // Only superadmins can specify storeId in request body
-          if (verified.payload.role === 'SUPERADMIN') {
-            storeId = bodyStoreId;
-          }
-        } catch {
-          // JWT verification failed, storeId will remain null and fail below
+      if (authHeader?.startsWith('Bearer ')) {
+        const payload = verifyToken(authHeader.slice(7));
+        userRole = payload?.role ?? 'STAFF';
+        if (payload?.role === 'SUPERADMIN') {
+          storeId = bodyStoreId;
+          void logSuperadminAccess(payload.userId, bodyStoreId, 'CREATE_USER', { email: body.email, role: body.role });
         }
       }
     }
@@ -174,14 +174,9 @@ export async function DELETE(request: NextRequest) {
     // Determine caller role from JWT
     let callerRole = 'STAFF';
     const authHeader = request.headers.get('authorization');
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      try {
-        const verified = await jwtVerify(token, JWT_SECRET);
-        callerRole = verified.payload.role as string;
-      } catch {
-        // continue with default
-      }
+    if (authHeader?.startsWith('Bearer ')) {
+      const payload = verifyToken(authHeader.slice(7));
+      if (payload?.role) callerRole = payload.role;
     }
 
     const storeId = await getStoreId();

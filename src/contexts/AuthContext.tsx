@@ -40,43 +40,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [store, setStore] = useState<Store | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize from localStorage
+  // Initialize: restore UI state from localStorage for fast render, then
+  // verify the session is still valid via /api/auth/me (reads httpOnly cookie).
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('user');
-      if (stored && stored !== 'undefined') {
-        const parsed = JSON.parse(stored);
-        if (parsed && typeof parsed === 'object') {
-          setUser(parsed);
+    const restore = async () => {
+      try {
+        // Fast-render: restore cached user/store from localStorage
+        const stored = localStorage.getItem('user');
+        if (stored && stored !== 'undefined') {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object') setUser(parsed);
         }
-      }
-      const storedStoreId = localStorage.getItem('storeId');
-      if (storedStoreId && storedStoreId !== 'undefined') {
-        setStoreId(storedStoreId);
-      }
-      // Restore store data from localStorage including currency
-      const storedStore = localStorage.getItem('store');
-      if (storedStore && storedStore !== 'undefined') {
-        const parsedStore = JSON.parse(storedStore);
-        if (parsedStore && typeof parsedStore === 'object') {
-          console.log('[AuthContext] Restored store from localStorage:', {
-            id: parsedStore.id,
-            backgroundImage: parsedStore.backgroundImage ? 'present' : 'null',
-            primaryColor: parsedStore.primaryColor,
-          });
-          setStore(parsedStore);
+        const storedStoreId = localStorage.getItem('storeId');
+        if (storedStoreId && storedStoreId !== 'undefined') setStoreId(storedStoreId);
+        const storedStore = localStorage.getItem('store');
+        if (storedStore && storedStore !== 'undefined') {
+          const parsedStore = JSON.parse(storedStore);
+          if (parsedStore && typeof parsedStore === 'object') setStore(parsedStore);
         }
+      } catch {
+        localStorage.removeItem('user');
+        localStorage.removeItem('storeId');
+        localStorage.removeItem('store');
       }
-    } catch (error) {
-      console.warn('Failed to restore auth state:', error);
-      // Clear invalid auth data
-      localStorage.removeItem('user');
-      localStorage.removeItem('storeId');
-      localStorage.removeItem('store');
-      localStorage.removeItem('token');
-    } finally {
-      setIsLoading(false);
-    }
+
+      // Validate session against server (reads httpOnly cookie)
+      try {
+        let res = await fetch('/api/auth/me');
+        if (res.status === 401) {
+          // Try to silently refresh the access token using the refresh_token cookie
+          const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
+          if (refreshRes.ok) {
+            res = await fetch('/api/auth/me');
+          }
+        }
+        if (!res.ok) {
+          // Cookie expired or invalid — clear stale UI state
+          setUser(null);
+          setStoreId(null);
+          setStore(null);
+          localStorage.removeItem('user');
+          localStorage.removeItem('storeId');
+          localStorage.removeItem('store');
+        }
+      } catch {
+        // Network error — keep cached state so the app still renders offline
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    restore();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -97,26 +111,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const { user, token, store } = data.data;
-    console.log('[AuthContext] Login successful:', {
-      userId: user.id,
-      storeId: user.storeId,
-      storeHasBranding: !!store,
-      backgroundImage: store?.backgroundImage ? 'present' : 'null',
-      primaryColor: store?.primaryColor,
-    });
 
     setUser(user);
     setStoreId(user.storeId);
-    // For superadmin with no store selected, don't set a default store
     if (store) {
       setStore(store);
       localStorage.setItem('store', JSON.stringify(store));
     } else if (user.storeId) {
       setStore({ id: user.storeId, name: '', email: '', currency: 'USD' });
     }
+    // Persist non-sensitive UI state to localStorage for fast restore on next load.
+    // The JWT itself is stored only in the httpOnly cookie (set server-side).
     localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token);
-    // Only set storeId in localStorage if it's not null (for superadmins, storeId is null)
     if (user.storeId) {
       localStorage.setItem('storeId', user.storeId);
     } else {
@@ -125,11 +131,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    // Clear the httpOnly cookie server-side
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Non-fatal
+    }
     setUser(null);
     setStoreId(null);
     setStore(null);
     localStorage.removeItem('user');
-    localStorage.removeItem('token');
     localStorage.removeItem('storeId');
     localStorage.removeItem('store');
   };
@@ -145,14 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    // Otherwise, fetch store details from API
+    // Cookies are sent automatically for same-origin requests—no Authorization header needed
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/stores/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(`/api/stores/${id}`);
       if (response.ok) {
         const data = await response.json();
         if (data.data) {
@@ -207,13 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!isMounted) return;
       
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/stores/branding`, {
-          headers: {
-            'x-store-id': storeId,
-            ...(token && { 'Authorization': `Bearer ${token}` }),
-          },
-        });
+        const response = await fetch(`/api/stores/branding`);
 
         if (!response.ok) {
           console.error('[AuthContext] Branding refresh failed:', response.status);

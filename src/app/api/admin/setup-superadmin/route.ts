@@ -2,24 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import bcryptjs from 'bcryptjs';
 
-// WARNING: This endpoint should only be used in development!
-// Remove or restrict this in production
-
 export async function POST(request: NextRequest) {
+  // Block entirely outside of development
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   try {
+    const body = await request.json();
+    const { password } = body;
+
+    if (!password || typeof password !== 'string' || password.length < 16) {
+      return NextResponse.json(
+        { error: 'A password of at least 16 characters must be supplied in the request body.' },
+        { status: 400 }
+      );
+    }
+
     // Check if superadmin already exists
     const existingSuperadmin = await prisma.user.findFirst({
       where: { role: 'SUPERADMIN' },
     });
 
     if (existingSuperadmin) {
-      return NextResponse.json({
-        error: 'Superadmin already exists',
-        message: 'A superadmin account already exists. Email: ' + existingSuperadmin.email,
-      }, { status: 400 });
+      return NextResponse.json(
+        { error: 'A superadmin account already exists.' },
+        { status: 400 }
+      );
     }
 
-    // Create a temporary store for the superadmin
+    // Create a store record for the superadmin
     const tempStore = await prisma.store.create({
       data: {
         name: 'System Administrator',
@@ -28,9 +40,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Create superadmin user
-    const hashedPassword = await bcryptjs.hash('superadmin123', 10);
-    const superadmin = await prisma.user.create({
+    const hashedPassword = await bcryptjs.hash(password, 12);
+    await prisma.user.create({
       data: {
         email: 'superadmin@system.local',
         password: hashedPassword,
@@ -42,12 +53,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Superadmin account created successfully!',
-      credentials: {
-        email: 'superadmin@system.local',
-        password: 'superadmin123',
-        warning: '⚠️ Change this password immediately in production!',
-      },
+      message: 'Superadmin account created. Use the email and password you supplied to log in.',
     });
   } catch (error: any) {
     console.error('Error creating superadmin:', error);

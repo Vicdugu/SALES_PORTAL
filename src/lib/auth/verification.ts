@@ -8,11 +8,12 @@ export function generateVerificationCode(): string {
 }
 
 /**
- * Get the expiry time for verification codes (24 hours from now)
+ * Get the expiry time for verification codes (15 minutes from now).
+ * Reduced from 24 hours — short window limits brute-force exposure.
  */
 export function getVerificationCodeExpiry(): Date {
   const expiryDate = new Date();
-  expiryDate.setHours(expiryDate.getHours() + 24);
+  expiryDate.setMinutes(expiryDate.getMinutes() + 15);
   return expiryDate;
 }
 

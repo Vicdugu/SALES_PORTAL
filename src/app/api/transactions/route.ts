@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
-import { jwtVerify } from 'jose';
+import { verifyToken } from '@/lib/auth/jwt';
+import { logSuperadminAccess } from '@/lib/auth/superadmin-audit';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
+function getPayload(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) return verifyToken(authHeader.slice(7));
+  return null;
+}
+
+function getRole(request: NextRequest): string {
+  return getPayload(request)?.role ?? 'STAFF';
+}
 
 /**
  * GET /api/transactions - Get transaction history
@@ -14,17 +23,7 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secr
 export async function GET(request: NextRequest) {
   try {
     // Get user role from JWT token
-    let userRole = 'STAFF'; // default
-    const authHeader = request.headers.get('authorization');
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      try {
-        const verified = await jwtVerify(token, JWT_SECRET);
-        userRole = verified.payload.role as string;
-      } catch {
-        // Token verification failed, continue with default
-      }
-    }
+    const userRole = getRole(request);
 
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
@@ -60,7 +59,13 @@ export async function GET(request: NextRequest) {
 
     // SUPERADMIN: fetch all stores' transactions
     if (userRole === 'SUPERADMIN') {
-      // No storeId filter needed - get all
+      // No storeId filter — superadmin gets all. Audit this cross-tenant access.
+      const caller = getPayload(request);
+      if (caller?.userId) {
+        void logSuperadminAccess(caller.userId, 'ALL', 'READ_ALL_TRANSACTIONS', {
+          filters: { startDate, endDate, filterStatus, filterPayment },
+        });
+      }
     } else {
       // ADMIN/STAFF: only their store
       const storeId = await getStoreId();

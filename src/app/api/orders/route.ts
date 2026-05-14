@@ -5,6 +5,7 @@ import { getUserId } from '@/lib/tenancy/get-user-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { orderBroadcaster } from '@/lib/realtime/OrderBroadcaster';
 import { createNotification } from '@/lib/notifications/service';
+import { CreateOrderSchema } from '@/lib/validation/schemas';
 
 /**
  * GET /api/orders - Get orders for a store
@@ -79,16 +80,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { items, notes, paymentMethod, payments, printedForKitchen } = body;
-
-    if (!items || items.length === 0) {
+    const parsed = CreateOrderSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        errorResponse('VALIDATION_ERROR', 'Items are required'),
+        errorResponse('VALIDATION_ERROR', parsed.error.issues.map(i => i.message).join('; ')),
         { status: 400 }
       );
     }
+    const { items, notes, paymentMethod, payments, printedForKitchen } = parsed.data;
 
-    // Validate payment data
     if (!payments && !paymentMethod) {
       return NextResponse.json(
         errorResponse('VALIDATION_ERROR', 'Payment method is required'),
@@ -96,11 +96,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate totals
-    const subtotal = items.reduce(
-      (sum: number, item: any) => sum + item.unitPrice * item.quantity,
-      0
-    );
+    // Calculate totals using integer arithmetic (pence) to avoid float rounding errors
+    const subtotal = Math.round(
+      items.reduce((sum: number, item: any) => sum + item.unitPrice * item.quantity, 0) * 100
+    ) / 100;
     const tax = 0; // No tax
     const total = subtotal;
 
@@ -114,7 +113,8 @@ export async function POST(request: NextRequest) {
       }
 
       const totalPaid = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-      if (Math.abs(totalPaid - total) > 0.01) {
+      // Compare using integer arithmetic to avoid float precision errors
+      if (Math.round(totalPaid * 100) !== Math.round(total * 100)) {
         return NextResponse.json(
           errorResponse('VALIDATION_ERROR', `Payment total (${totalPaid.toFixed(2)}) does not match order total (${total.toFixed(2)})`),
           { status: 400 }

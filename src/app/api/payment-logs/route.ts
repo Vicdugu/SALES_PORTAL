@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStoreId } from '@/lib/tenancy/get-store-id';
+import { verifyToken } from '@/lib/auth/jwt';
+import { prisma } from '@/lib/db/client';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 
+function getTokenPayload(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  return verifyToken(authHeader.slice(7));
+}
+
 /**
- * POST /api/payment-logs - Log payment selection
+ * POST /api/payment-logs - Log payment selection to the audit trail
  */
 export async function POST(request: NextRequest) {
   try {
-    const storeId = await getStoreId();
-    if (!storeId) {
+    const payload = getTokenPayload(request);
+    if (!payload?.storeId) {
       return NextResponse.json(
-        errorResponse('UNAUTHORIZED', 'Store ID not found'),
+        errorResponse('UNAUTHORIZED', 'Valid authentication token required'),
         { status: 401 }
       );
     }
@@ -25,16 +32,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate payment method
-    if (!['CASH', 'TRANSFER', 'POS'].includes(paymentMethod)) {
+    const VALID_METHODS = ['CASH', 'TRANSFER', 'POS'];
+    if (!VALID_METHODS.includes(paymentMethod)) {
       return NextResponse.json(
         errorResponse('VALIDATION_ERROR', 'Invalid payment method'),
         { status: 400 }
       );
     }
 
-    // Log to console (in production, would save to database)
-    console.log(`[PAYMENT LOG] Order: ${orderId} | Method: ${paymentMethod} | Store: ${storeId} | Time: ${new Date().toISOString()}`);
+    // Persist to AuditLog so the record survives beyond the serverless function
+    await prisma.auditLog.create({
+      data: {
+        storeId: payload.storeId,
+        userId: payload.userId,
+        action: 'PAYMENT_METHOD_SELECTED',
+        resource: orderId,
+        details: paymentMethod,
+      },
+    });
 
     return NextResponse.json(
       successResponse({
@@ -55,26 +70,41 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET /api/payment-logs - Get payment logs (mock)
+ * GET /api/payment-logs - Retrieve payment audit logs for this store
  */
 export async function GET(request: NextRequest) {
   try {
-    const storeId = await getStoreId();
-    if (!storeId) {
+    const payload = getTokenPayload(request);
+    if (!payload?.storeId) {
       return NextResponse.json(
-        errorResponse('UNAUTHORIZED', 'Store ID not found'),
+        errorResponse('UNAUTHORIZED', 'Valid authentication token required'),
         { status: 401 }
       );
     }
 
-    // Return mock payment logs
-    const mockLogs = [
-      { id: '1', orderId: 'ORD-001', paymentMethod: 'CASH', timestamp: new Date().toISOString() },
-      { id: '2', orderId: 'ORD-002', paymentMethod: 'TRANSFER', timestamp: new Date().toISOString() },
-      { id: '3', orderId: 'ORD-003', paymentMethod: 'POS', timestamp: new Date().toISOString() },
-    ];
+    const logs = await prisma.auditLog.findMany({
+      where: {
+        storeId: payload.storeId,
+        action: 'PAYMENT_METHOD_SELECTED',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        resource: true,   // orderId
+        details: true,    // paymentMethod
+        createdAt: true,
+      },
+    });
 
-    return NextResponse.json(successResponse(mockLogs));
+    const formatted = logs.map((log) => ({
+      id: log.id,
+      orderId: log.resource,
+      paymentMethod: log.details,
+      timestamp: log.createdAt.toISOString(),
+    }));
+
+    return NextResponse.json(successResponse(formatted));
   } catch (error) {
     console.error('Error fetching payment logs:', error);
     return NextResponse.json(

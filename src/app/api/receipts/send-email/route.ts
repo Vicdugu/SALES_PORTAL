@@ -3,8 +3,48 @@ import { verifyToken } from '@/lib/auth/jwt';
 import { generateReceiptPDF } from '@/lib/email/receipt-generator';
 import { sendReceiptEmail } from '@/lib/email/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+
+/** Max receipt emails per store within the rate-limit window. */
+const EMAIL_RATE_LIMIT = 10;
+const EMAIL_RATE_WINDOW_MINUTES = 60;
+
+/**
+ * Check whether a store has exceeded the receipt-email send limit.
+ * Uses the VerificationAttempt table for a consistent, serverless-safe approach.
+ */
+async function checkEmailRateLimit(storeId: string): Promise<boolean> {
+  try {
+    const windowStart = new Date(Date.now() - EMAIL_RATE_WINDOW_MINUTES * 60 * 1000);
+    const count = await prisma.verificationAttempt.count({
+      where: {
+        email: `receipt_rate:${storeId}`,
+        reason: 'RECEIPT_EMAIL_SENT',
+        createdAt: { gte: windowStart },
+      },
+    });
+    return count < EMAIL_RATE_LIMIT;
+  } catch {
+    return true; // fail open — non-fatal
+  }
+}
+
+async function recordEmailSent(storeId: string): Promise<void> {
+  try {
+    await prisma.verificationAttempt.create({
+      data: {
+        email: `receipt_rate:${storeId}`,
+        success: true,
+        reason: 'RECEIPT_EMAIL_SENT',
+        ipAddress: null,
+      },
+    });
+  } catch {
+    // non-fatal
+  }
+}
 
 /**
  * Validates email address format
@@ -16,8 +56,12 @@ function validateEmail(email: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
+    // Verify authentication — check Authorization header first, then httpOnly cookie
+    const headerToken = request.headers.get('Authorization')?.replace('Bearer ', '');
+    const cookiesList = await cookies();
+    const cookieToken = cookiesList.get('auth_token')?.value;
+    const token = headerToken ?? cookieToken;
+
     if (!token) {
       return NextResponse.json({ error: { message: 'Unauthorized' } }, { status: 401 });
     }
@@ -25,6 +69,18 @@ export async function POST(request: NextRequest) {
     const decoded = verifyToken(token);
     if (!decoded) {
       return NextResponse.json({ error: { message: 'Invalid token' } }, { status: 401 });
+    }
+
+    // Rate limit: max 10 receipt emails per store per hour
+    const storeId = decoded.storeId;
+    if (storeId) {
+      const allowed = await checkEmailRateLimit(storeId);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: { message: 'Too many receipt emails sent. Try again in an hour.' } },
+          { status: 429, headers: { 'Retry-After': '3600' } }
+        );
+      }
     }
 
     // Parse request body
@@ -125,6 +181,9 @@ export async function POST(request: NextRequest) {
         orderNumber: order.orderNumber,
         storeName: order.store.name,
       });
+
+      // Record the send for rate-limiting purposes
+      if (storeId) await recordEmailSent(storeId);
 
       return NextResponse.json(
         {

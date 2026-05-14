@@ -43,26 +43,42 @@ export async function PATCH(
       );
     }
 
-    // Update order
+    // Update order — use updateMany with a status guard on COMPLETED transitions
+    // to prevent double-completion races (returns count:0 if already processed).
     const updateData: any = { status };
     if (status === 'COMPLETED') {
       updateData.completedAt = new Date();
     }
-    
-    const updatedOrder = await prisma.order.update({
-      where: { id },
-      data: updateData,
-      include: {
-        items: true,
-        staff: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+
+    let updatedOrder;
+    if (status === 'COMPLETED') {
+      const result = await prisma.order.updateMany({
+        where: { id, storeId, status: 'PENDING' },
+        data: updateData,
+      });
+      if (result.count === 0) {
+        return NextResponse.json(
+          errorResponse('CONFLICT', 'Order has already been completed or is no longer pending'),
+          { status: 409 }
+        );
+      }
+      updatedOrder = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          items: true,
+          staff: { select: { id: true, name: true, email: true } },
         },
-      },
-    });
+      });
+    } else {
+      updatedOrder = await prisma.order.update({
+        where: { id },
+        data: updateData,
+        include: {
+          items: true,
+          staff: { select: { id: true, name: true, email: true } },
+        },
+      });
+    }
 
     // Broadcast status change event to all admin dashboards
     orderBroadcaster.broadcast({
@@ -79,7 +95,7 @@ export async function PATCH(
     });
 
     // Persist notification for relevant status changes
-    const orderNum = updatedOrder.orderNumber;
+    const orderNum = updatedOrder?.orderNumber ?? order.orderNumber;
     if (status === 'IN_PROGRESS') {
       await createNotification({
         storeId,
@@ -106,7 +122,7 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json(successResponse(updatedOrder));
+    return NextResponse.json(successResponse(updatedOrder ?? order));
   } catch (error) {
     console.error('Error updating order:', error);
     return NextResponse.json(

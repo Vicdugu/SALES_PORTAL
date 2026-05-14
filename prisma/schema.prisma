@@ -33,6 +33,8 @@ model Store {
   emailVerified Boolean @default(false)
   verificationCode String?
   verificationCodeExpiry DateTime?
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
@@ -61,6 +63,8 @@ model User {
   store     Store?   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   
   isActive  Boolean  @default(true)
+  refreshTokenHash   String?
+  refreshTokenExpiry DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
@@ -121,6 +125,7 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   completedAt DateTime?
+  refundedAt  DateTime?
   
   @@index([storeId])
   @@index([staffId])
@@ -149,6 +154,7 @@ enum OrderStatus {
   READY
   COMPLETED
   CANCELLED
+  REFUNDED
 }
 
 model OrderItem {

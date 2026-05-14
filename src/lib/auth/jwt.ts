@@ -7,17 +7,18 @@ interface TokenPayload {
   role: string;
 }
 
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET environment variable is required in production');
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('FATAL: JWT_SECRET environment variable is required');
 }
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const _JWT_SECRET: string = JWT_SECRET;
 const TOKEN_EXPIRY = '24h';
 
 /**
  * Generate JWT token
  */
 export function generateToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
+  return jwt.sign(payload, _JWT_SECRET, {
     expiresIn: TOKEN_EXPIRY,
   });
 }
@@ -27,7 +28,7 @@ export function generateToken(payload: TokenPayload): string {
  */
 export function verifyToken(token: string): TokenPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
+    const decoded = jwt.verify(token, _JWT_SECRET) as TokenPayload;
     return decoded;
   } catch (error) {
     console.error('Token verification failed:', error);

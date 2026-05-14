@@ -1,5 +1,31 @@
 import { Resend } from "resend";
 
+// ── Security helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Escape user-supplied strings before embedding them in an HTML template.
+ * Prevents XSS / HTML injection in email bodies.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
+/**
+ * Sanitise a value used as an email header (subject, to, from).
+ * Strips CR/LF characters that could enable header injection, and
+ * truncates to 998 chars per RFC 5322.
+ */
+function sanitiseHeader(value: string): string {
+  return value.replace(/[\r\n]+/g, '').slice(0, 998);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 let resend: Resend | null = null;
 
 function getResend() {
@@ -40,37 +66,53 @@ export interface EmailOptions {
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  try {
-    const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
-    
-    console.log(`[EMAIL] Sending to ${options.to} from ${from}`);
-    console.log(`[EMAIL] Subject: ${options.subject}`);
-    console.log(`[EMAIL] Resend API Key configured: ${!!process.env.RESEND_API_KEY}`);
-    
-    const resendInstance = getResend();
-    if (!resendInstance) {
-      console.error("[EMAIL] Resend API Key is missing");
-      return false;
+  const MAX_ATTEMPTS = 3;
+  const INITIAL_DELAY_MS = 500;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
+      const resendInstance = getResend();
+      if (!resendInstance) {
+        console.error("[EMAIL] Resend API Key is missing");
+        return false;
+      }
+
+      const result = await resendInstance.emails.send({
+        from,
+        to: sanitiseHeader(options.to),
+        subject: sanitiseHeader(options.subject),
+        html: options.html,
+      });
+
+      if (result.error) {
+        // Certain errors are terminal — no point retrying (e.g. invalid address)
+        const isTerminal =
+          result.error.message?.toLowerCase().includes('invalid') ||
+          result.error.message?.toLowerCase().includes('not found');
+        if (isTerminal || attempt === MAX_ATTEMPTS) {
+          console.error(`[EMAIL] Permanent failure after ${attempt} attempt(s):`, result.error);
+          return false;
+        }
+        const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
+        console.warn(`[EMAIL] Attempt ${attempt} failed, retrying in ${delay}ms:`, result.error.message);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      console.log(`[EMAIL] Sent successfully to ${sanitiseHeader(options.to)} (attempt ${attempt})`);
+      return true;
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS) {
+        console.error("[EMAIL] Exception sending email (final attempt):", error);
+        return false;
+      }
+      const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
+      console.warn(`[EMAIL] Exception on attempt ${attempt}, retrying in ${delay}ms:`, error);
+      await new Promise((r) => setTimeout(r, delay));
     }
-
-    const result = await resendInstance.emails.send({
-      from,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-    });
-
-    if (result.error) {
-      console.error("[EMAIL] Resend API Error:", result.error);
-      return false;
-    }
-
-    console.log(`[EMAIL] Sent successfully to ${options.to}, Email ID: ${result.data?.id}`);
-    return true;
-  } catch (error) {
-    console.error("[EMAIL] Exception sending email:", error);
-    return false;
   }
+  return false;
 }
 
 export async function sendVerificationEmail(
@@ -78,12 +120,14 @@ export async function sendVerificationEmail(
   email: string,
   verificationCode: string
 ): Promise<boolean> {
+  const safeStoreName = escapeHtml(storeName);
+  const safeCode = escapeHtml(verificationCode);
   const html = `<!DOCTYPE html>
 <html>
 <body>
   <h1>Welcome to Sales Portal!</h1>
-  <p>Hi <strong>${storeName}</strong>,</p>
-  <p>Your Verification Code: <strong>${verificationCode}</strong></p>
+  <p>Hi <strong>${safeStoreName}</strong>,</p>
+  <p>Your Verification Code: <strong>${safeCode}</strong></p>
 </body>
 </html>`;
 
@@ -103,6 +147,9 @@ export async function sendVerificationLinkEmail(
   email: string,
   verificationLink: string
 ): Promise<boolean> {
+  const safeStoreName = escapeHtml(storeName);
+  // The verification link is a trusted internal URL — escape only for HTML attribute safety
+  const safeLink = escapeHtml(verificationLink);
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -124,11 +171,11 @@ export async function sendVerificationLinkEmail(
     <div class="header"><h1>Sales Portal</h1></div>
     <div class="body">
       <h2 style="margin-top:0">Verify your email address</h2>
-      <p>Hi <strong>${storeName}</strong>,</p>
+      <p>Hi <strong>${safeStoreName}</strong>,</p>
       <p>Thank you for registering. Click the button below to verify your email address and activate your store account.</p>
-      <a href="${verificationLink}" class="cta">Verify Email</a>
+      <a href="${safeLink}" class="cta">Verify Email</a>
       <p>Or copy and paste this link into your browser:</p>
-      <p style="word-break:break-all;font-size:13px;color:#555">${verificationLink}</p>
+      <p style="word-break:break-all;font-size:13px;color:#555">${safeLink}</p>
       <p class="note">This link expires in 24 hours and can only be used once. If you did not register for Sales Portal, you can safely ignore this email.</p>
     </div>
     <div class="footer">Sales Portal &mdash; Powered by Questbridge Ltd</div>
@@ -138,7 +185,7 @@ export async function sendVerificationLinkEmail(
 
   return sendEmail({
     to: email,
-    subject: `Verify your Sales Portal account — ${storeName}`,
+    subject: sanitiseHeader(`Verify your Sales Portal account — ${storeName}`),
     html,
   });
 }
@@ -187,6 +234,10 @@ export async function sendReceiptEmail(
 
     console.log("[EMAIL] ✅ Resend instance available, proceeding with send...");
 
+    // Sanitise user-supplied values used in HTML template and email headers
+    const safeStoreName = escapeHtml(options.storeName);
+    const safeOrderNumber = escapeHtml(options.orderNumber);
+
     // Format currency symbol
     let currencySymbol = "$";
     const currencyMap: { [key: string]: string } = {
@@ -225,14 +276,14 @@ export async function sendReceiptEmail(
 <body>
   <div class="container">
     <div class="header">
-      <div class="store-name">${options.storeName}</div>
+      <div class="store-name">${safeStoreName}</div>
       <p style="margin: 10px 0 0 0; color: #7f8c8d;">Digital Receipt</p>
     </div>
     
     <div class="receipt-details">
       <div class="receipt-item">
         <span>Order Number:</span>
-        <span>#${options.orderNumber}</span>
+        <span>#${safeOrderNumber}</span>
       </div>
       <div class="receipt-item">
         <span>Date:</span>
@@ -275,7 +326,7 @@ export async function sendReceiptEmail(
     const result = await resendInstance.emails.send({
       from,
       to: options.to,
-      subject: `Receipt for Order #${options.orderNumber} from ${options.storeName}`,
+      subject: sanitiseHeader(`Receipt for Order #${options.orderNumber} from ${options.storeName}`),
       html,
       attachments: [
         {

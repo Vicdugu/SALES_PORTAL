@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { getTokenFromHeader, verifyToken } from '@/lib/auth/jwt';
+import { logSuperadminAccess } from '@/lib/auth/superadmin-audit';
 
 /**
  * POST /api/stores/[id]/approve - Approve a pending store (SUPERADMIN only)
@@ -55,16 +56,11 @@ export async function POST(
     // Update store approval status
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
-      data: {
-        isApproved: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        isApproved: true,
-      },
+      data: { isApproved: true },
+      select: { id: true, name: true, email: true, isApproved: true },
     });
+
+    void logSuperadminAccess(tokenPayload.userId, storeId, 'APPROVE_STORE', { storeName: updatedStore.name });
 
     return NextResponse.json(
       successResponse({

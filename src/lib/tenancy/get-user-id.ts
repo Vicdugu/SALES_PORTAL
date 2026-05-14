@@ -1,33 +1,30 @@
-import { headers } from 'next/headers';
-import { jwtVerify } from 'jose';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
+import { headers, cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth/jwt';
 
 /**
- * Extract user ID from JWT token in Authorization header
- * Returns the ID of the currently authenticated user
+ * Extract user ID from the verified JWT.
+ * Checks the Authorization header first, then the httpOnly auth_token cookie.
  */
 export async function getUserId(): Promise<string | null> {
   try {
     const headersList = await headers();
+
+    // 1. Authorization header
     const authHeader = headersList.get('authorization');
-    
-    if (!authHeader) {
-      console.log('[getUserId] No authorization header found');
-      return null;
+    if (authHeader?.startsWith('Bearer ')) {
+      const payload = verifyToken(authHeader.slice(7));
+      if (payload?.userId) return payload.userId;
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    
-    try {
-      const verified = await jwtVerify(token, JWT_SECRET);
-      const userId = verified.payload.userId as string;
-      console.log('[getUserId] Extracted userId from token:', userId);
-      return userId;
-    } catch (error) {
-      console.error('[getUserId] JWT verification failed:', error);
-      return null;
+    // 2. httpOnly cookie
+    const cookiesList = await cookies();
+    const cookieToken = cookiesList.get('auth_token')?.value;
+    if (cookieToken) {
+      const payload = verifyToken(cookieToken);
+      return payload?.userId ?? null;
     }
+
+    return null;
   } catch (error) {
     console.error('[getUserId] Error extracting user ID:', error);
     return null;
