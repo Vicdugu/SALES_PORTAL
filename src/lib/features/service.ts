@@ -116,7 +116,8 @@ export async function hasFeature(storeId: string, flag: string): Promise<boolean
 export async function setFeature(
   storeId: string,
   flagKey: string,
-  enabled: boolean
+  enabled: boolean,
+  changedByUserId?: string
 ): Promise<{ storeId: string; flagKey: string; enabled: boolean }> {
   const record = await (prisma as any).storeFeature.upsert({
     where: { storeId_flagKey: { storeId, flagKey } },
@@ -124,6 +125,23 @@ export async function setFeature(
     create: { storeId, flagKey, enabled },
     select: { storeId: true, flagKey: true, enabled: true },
   });
+
+  // Audit log — only when we have a userId to attribute the change to
+  if (changedByUserId) {
+    try {
+      await prisma.auditLog.create({
+        data: {
+          storeId,
+          userId: changedByUserId,
+          action: 'FEATURE_FLAG_CHANGED',
+          resource: `FLAG:${flagKey}`,
+          details: JSON.stringify({ flagKey, enabled }),
+        },
+      });
+    } catch (err) {
+      console.warn('[FeatureFlags] Failed to write audit log:', err);
+    }
+  }
 
   // Invalidate all cache layers immediately so next read reflects the change
   await invalidateCache(storeId);

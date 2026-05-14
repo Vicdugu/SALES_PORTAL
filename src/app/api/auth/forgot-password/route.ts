@@ -89,6 +89,10 @@ export async function POST(request: NextRequest) {
       <p class="note">If you did not request a password reset, you can safely ignore this email. Your password will not change.</p>
     </div>
     <div class="footer">Sales Portal &mdash; Powered by Questbridge Ltd</div>
+    <div style="text-align:center;font-size:11px;color:#aaa;margin-top:32px;padding-top:16px;border-top:1px solid #e0e0e0;">
+      <p style="margin:4px 0;">${process.env.BUSINESS_ADDRESS ?? 'Questbridge Ltd, United Kingdom'}</p>
+      <p style="margin:4px 0;">You received this email because a password reset was requested for this address.</p>
+    </div>
   </div>
 </body>
 </html>`,

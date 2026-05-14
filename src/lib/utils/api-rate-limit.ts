@@ -43,7 +43,9 @@ export async function checkApiRateLimit(
     const remaining = Math.max(0, limit - count);
     return { allowed: count < limit, remaining };
   } catch {
-    return { allowed: true, remaining: limit };
+    // Fail closed: if we cannot check the rate limit, deny the request
+    // to prevent abuse during DB outages
+    return { allowed: false, remaining: 0 };
   }
 }
 

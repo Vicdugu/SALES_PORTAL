@@ -24,8 +24,8 @@ async function checkRateLimit(
     const remaining = Math.max(0, MAX_FAILED_ATTEMPTS - failedCount);
     return { allowed: failedCount < MAX_FAILED_ATTEMPTS, remaining };
   } catch {
-    console.error('[RATE_LIMIT] Could not query VerificationAttempt table — failing open');
-    return { allowed: true, remaining: MAX_FAILED_ATTEMPTS };
+    console.error('[RATE_LIMIT] Could not query VerificationAttempt table — failing closed');
+    return { allowed: false, remaining: 0 };
   }
 }
 

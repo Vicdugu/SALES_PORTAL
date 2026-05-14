@@ -24,6 +24,25 @@ function sanitiseHeader(value: string): string {
   return value.replace(/[\r\n]+/g, '').slice(0, 998);
 }
 
+/**
+ * Shared HTML footer included in all outbound emails.
+ * Satisfies CAN-SPAM (physical address) and provides an unsubscribe note.
+ * The unsubscribe address is the support email from env, falling back to a placeholder.
+ */
+function emailFooter(): string {
+  const supportEmail = process.env.EMAIL_SUPPORT ?? process.env.EMAIL_FROM ?? 'support@yourdomain.com';
+  const address = process.env.BUSINESS_ADDRESS ?? 'Questbridge Ltd, United Kingdom';
+  return `
+  <div style="text-align:center;font-size:11px;color:#aaa;margin-top:32px;padding-top:16px;border-top:1px solid #e0e0e0;">
+    <p style="margin:4px 0;">${escapeHtml(address)}</p>
+    <p style="margin:4px 0;">
+      You received this email because you have an account with Sales Portal.
+      To stop receiving emails, reply with &ldquo;unsubscribe&rdquo; to
+      <a href="mailto:${escapeHtml(supportEmail)}" style="color:#aaa;">${escapeHtml(supportEmail)}</a>.
+    </p>
+  </div>`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 let resend: Resend | null = null;
@@ -179,6 +198,7 @@ export async function sendVerificationLinkEmail(
       <p class="note">This link expires in 24 hours and can only be used once. If you did not register for Sales Portal, you can safely ignore this email.</p>
     </div>
     <div class="footer">Sales Portal &mdash; Powered by Questbridge Ltd</div>
+    ${emailFooter()}
   </div>
 </body>
 </html>`;
@@ -310,6 +330,7 @@ export async function sendReceiptEmail(
       <p>Thank you for your purchase!</p>
       <p style="margin: 5px 0;">Please keep this email and attached receipt for your records.</p>
       <p style="margin: 5px 0;">Generated on ${new Date().toLocaleString()}</p>
+      ${emailFooter()}
     </div>
   </div>
 </body>

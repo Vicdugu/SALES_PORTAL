@@ -92,7 +92,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Store not found' }, { status: 404 });
     }
 
-    const updated = await setFeature(storeId, flagKey, enabled);
+    const updated = await setFeature(storeId, flagKey, enabled, payload.userId);
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     console.error('[PATCH /api/admin/features]', error);

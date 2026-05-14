@@ -9,6 +9,10 @@
     "src/app/api/**/*.ts": {
       "memory": 1024,
       "maxDuration": 60
+    },
+    "src/app/api/receipts/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 300
     }
   },
   "crons": [

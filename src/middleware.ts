@@ -37,7 +37,7 @@ export function middleware(request: NextRequest) {
   if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
     return NextResponse.json(
       { error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds the 1 MB limit' } },
-      { status: 413 }
+      { status: 413, headers: { 'x-request-id': crypto.randomUUID() } }
     );
   }
 
@@ -78,11 +78,13 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Pass through — attach CORS headers to the real response
+  // Pass through — attach CORS headers and request ID to the real response
+  const requestId = crypto.randomUUID();
   const response = NextResponse.next();
   for (const [key, value] of Object.entries(corsHeaders)) {
     response.headers.set(key, value);
   }
+  response.headers.set('x-request-id', requestId);
   return response;
 }
 
