@@ -23,7 +23,7 @@ function getAllowedOrigins(): string[] {
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const requestMethod = request.method;
 
