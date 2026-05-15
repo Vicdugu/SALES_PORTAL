@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { withTenantContext, withSuperadminContext } from '@/lib/db/tenant-context';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { hashPassword } from '@/lib/auth/hash';
 import { errorResponse, successResponse } from '@/lib/utils/response';
@@ -61,17 +62,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const users = await prisma.user.findMany({
-      where: { storeId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const users = await (userRole === 'SUPERADMIN' && !request.nextUrl.searchParams.get('storeId')
+      ? withSuperadminContext((tx) => tx.user.findMany({
+          where: { storeId: storeId ?? undefined },
+          select: { id: true, name: true, email: true, role: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        }))
+      : withTenantContext(storeId!, (tx) => tx.user.findMany({
+          where: { storeId },
+          select: { id: true, name: true, email: true, role: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        }))
+    );
 
     return NextResponse.json(successResponse(users));
   } catch (error) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { withTenantContext, withSuperadminContext } from '@/lib/db/tenant-context';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { verifyToken } from '@/lib/auth/jwt';
@@ -79,22 +80,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch orders with their store info and items
-    const orders = await prisma.order.findMany({
+    const queryArgs = {
       where,
       include: {
-        store: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        store: { select: { id: true, name: true } },
         items: true,
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 500, // Limit to 500 transactions
-    });
+      orderBy: { createdAt: 'desc' as const },
+      take: 500,
+    };
+
+    const orders = userRole === 'SUPERADMIN'
+      ? await withSuperadminContext((tx) => tx.order.findMany(queryArgs))
+      : await withTenantContext(where.storeId as string, (tx) => tx.order.findMany(queryArgs));
 
     // Format response
     const transactions = orders.map((order: { id: string; orderNumber: string; storeId: string; store?: { name: string } | null; total: number; paymentMethod: string | null; status: string; createdAt: Date; items: unknown[] }) => ({

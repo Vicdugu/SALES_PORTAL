@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { prisma } from '@/lib/db/client';
+import { withTenantContext } from '@/lib/db/tenant-context';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 
 /**
@@ -20,17 +21,19 @@ export async function GET(request: NextRequest) {
 
     // Get inventory items from database
     console.log('[inventory GET] Fetching items for store:', storeId);
-    const items = await prisma.inventoryItem.findMany({
-      where: { storeId },
-      select: {
-        id: true,
-        name: true,
-        category: true,
-        unitPrice: true,
-        quantity: true,
-      },
-      orderBy: [{ category: 'asc' }, { name: 'asc' }],
-    });
+    const items = await withTenantContext(storeId, (tx) =>
+      tx.inventoryItem.findMany({
+        where: { storeId },
+        select: {
+          id: true,
+          name: true,
+          category: true,
+          unitPrice: true,
+          quantity: true,
+        },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      })
+    );
 
     console.log('[inventory GET] Found items:', items.length);
     return NextResponse.json(successResponse(items));

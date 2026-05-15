@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { withTenantContext } from '@/lib/db/tenant-context';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 
@@ -23,12 +24,14 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - days);
 
     // Get orders in the date range
-    const orders = await prisma.order.findMany({
-      where: {
-        storeId,
-        createdAt: { gte: startDate },
-      },
-    });
+    const orders = await withTenantContext(storeId, (tx) =>
+      tx.order.findMany({
+        where: {
+          storeId,
+          createdAt: { gte: startDate },
+        },
+      })
+    );
 
     // Calculate metrics
     const totalOrders = orders.length;

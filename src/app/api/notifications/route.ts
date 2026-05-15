@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
+import { withTenantContext } from '@/lib/db/tenant-context';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
 import { verifyToken, getTokenFromHeader } from '@/lib/auth/jwt';
 import { errorResponse, successResponse } from '@/lib/utils/response';
@@ -30,17 +31,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch recent notifications for this store (last 60 to keep response small)
-    const allNotifications = await prisma.notification.findMany({
-      where: { storeId },
-      orderBy: { createdAt: 'desc' },
-      take: 60,
-      include: {
-        reads: {
-          where: { userId },
-          select: { readAt: true, dismissedAt: true },
+    const allNotifications = await withTenantContext(storeId, (tx) =>
+      tx.notification.findMany({
+        where: { storeId },
+        orderBy: { createdAt: 'desc' },
+        take: 60,
+        include: {
+          reads: {
+            where: { userId },
+            select: { readAt: true, dismissedAt: true },
+          },
         },
-      },
-    });
+      })
+    );
 
     // Attach per-user isRead / filter out dismissed ones
     const visible = allNotifications
