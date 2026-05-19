@@ -15,12 +15,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Accept optional password from body; fall back to auto-generated
+    // Accept optional password and reset flag from body; fall back to auto-generated
     let password = generateSecurePassword();
+    let resetMode = false;
+    let newEmail: string | undefined;
     try {
       const body = await request.json();
       if (typeof body?.password === 'string' && body.password.length >= 8) {
         password = body.password;
+      }
+      resetMode = body?.reset === true;
+      if (typeof body?.email === 'string' && body.email.includes('@')) {
+        newEmail = body.email.trim().toLowerCase();
       }
     } catch {
       // no body — keep generated password
@@ -31,14 +37,35 @@ export async function POST(request: NextRequest) {
       where: { role: 'SUPERADMIN' },
     });
 
+    // RESET MODE: update existing superadmin credentials
+    if (existingSuperadmin && resetMode) {
+      const hashedPassword = await bcryptjs.hash(password, 12);
+      const updatedEmail = newEmail ?? existingSuperadmin.email;
+      await prisma.user.update({
+        where: { id: existingSuperadmin.id },
+        data: { email: updatedEmail, password: hashedPassword },
+      });
+      if (existingSuperadmin.storeId) {
+        await prisma.store.update({
+          where: { id: existingSuperadmin.storeId },
+          data: { email: updatedEmail },
+        });
+      }
+      return NextResponse.json({
+        success: true,
+        message: 'Superadmin credentials reset successfully.',
+        credentials: { email: updatedEmail, password },
+      });
+    }
+
     if (existingSuperadmin) {
       return NextResponse.json(
-        { error: 'A superadmin account already exists.' },
+        { error: 'A superadmin account already exists. Enable reset mode to update credentials.' },
         { status: 400 }
       );
     }
 
-    const email = 'superadmin@system.local';
+    const email = newEmail ?? 'superadmin@system.local';
 
     // Create a store record for the superadmin
     const tempStore = await prisma.store.create({

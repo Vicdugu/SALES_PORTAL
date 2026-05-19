@@ -9,19 +9,23 @@ export default function SetupPage() {
   const [result, setResult] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
 
-  const handleCreateSuperadmin = async () => {
+  const handleSubmit = async () => {
     if (password.length < 8) {
       setResult({ error: 'Password must be at least 8 characters.' });
       return;
     }
     try {
       setLoading(true);
+      const body: Record<string, unknown> = { password, reset: resetMode };
+      if (email.trim()) body.email = email.trim();
       const response = await fetch('/api/admin/setup-superadmin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
@@ -60,7 +64,19 @@ export default function SetupPage() {
         {!result ? (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Choose a Password</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Email <span className="font-normal text-gray-500">(leave blank to keep existing)</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. victor.medugu@questbridge.co.uk"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -78,12 +94,21 @@ export default function SetupPage() {
                 </button>
               </div>
             </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={resetMode}
+                onChange={(e) => setResetMode(e.target.checked)}
+                className="rounded"
+              />
+              Reset existing superadmin credentials
+            </label>
             <button
-              onClick={handleCreateSuperadmin}
+              onClick={handleSubmit}
               disabled={loading || password.length < 8}
               className="w-full p-3 rounded-lg font-semibold transition bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white"
             >
-              {loading ? 'Creating...' : 'Create Superadmin Account'}
+              {loading ? 'Processing...' : resetMode ? 'Reset Superadmin Credentials' : 'Create Superadmin Account'}
             </button>
           </div>
         ) : result.success ? (
