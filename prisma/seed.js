@@ -50,26 +50,35 @@ async function seed() {
   });
 
   if (existing) {
-    // ── Superadmin exists — ensure email matches ──────────────────────────
+    // ── Superadmin exists — sync email and password ───────────────────────
+    const updates = {};
+    const storeUpdates = {};
+
     if (existing.email !== SUPERADMIN_EMAIL) {
-      await prisma.user.update({
-        where: { id: existing.id },
-        data: { email: SUPERADMIN_EMAIL },
-      });
-      if (existing.storeId) {
-        await prisma.store.update({
-          where: { id: existing.storeId },
-          data: { email: SUPERADMIN_EMAIL },
-        });
-      }
-      console.log(
-        `[seed] ✅ Superadmin email updated: ${existing.email} → ${SUPERADMIN_EMAIL}`
-      );
-    } else {
-      console.log(
-        `[seed] ✅ Superadmin already exists (${existing.email}) — no changes needed.`
-      );
+      updates.email = SUPERADMIN_EMAIL;
+      storeUpdates.email = SUPERADMIN_EMAIL;
+      console.log(`[seed] Updating email: ${existing.email} → ${SUPERADMIN_EMAIL}`);
     }
+
+    // Always sync the password so the Vercel env var is the source of truth.
+    const hashedPassword = await bcrypt.hash(SUPERADMIN_PASSWORD, 12);
+    updates.password = hashedPassword;
+
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: updates,
+    });
+
+    if (Object.keys(storeUpdates).length > 0 && existing.storeId) {
+      await prisma.store.update({
+        where: { id: existing.storeId },
+        data: storeUpdates,
+      });
+    }
+
+    console.log(
+      `[seed] ✅ Superadmin synced: ${SUPERADMIN_EMAIL} (password updated from env var)`
+    );
     return;
   }
 
