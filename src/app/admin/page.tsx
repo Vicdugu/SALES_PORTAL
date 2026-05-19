@@ -25,7 +25,10 @@ export default function AdminPage() {
   const { user, store, isLoading } = useAuth();
   const router = useRouter();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [activeTab, setActiveTab] = useState<AdminTab>('analytics');
+  // SUPERADMIN without a store defaults to approvals tab
+  const [activeTab, setActiveTab] = useState<AdminTab>(
+    () => (typeof window !== 'undefined' && !localStorage.getItem('storeId') ? 'approvals' : 'analytics')
+  );
   
   // Listen for real-time branding updates and refresh when changes occur
   useBrandingUpdates();
@@ -80,25 +83,7 @@ export default function AdminPage() {
     return <div className="p-8 text-red-600">Access denied. Admin only.</div>;
   }
 
-  // SUPERADMIN without a store - needs to select a store first
-  if (user.role === 'SUPERADMIN' && !store) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-12 rounded-lg shadow-lg max-w-md">
-          <h1 className="text-2xl font-bold mb-4">System Administrator</h1>
-          <p className="text-gray-600 mb-6">
-            As a super admin, please select a store from the store selection page to manage it.
-          </p>
-          <button
-            onClick={() => router.push('/')}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Go to Store Selection
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // SUPERADMIN without a store — show system-wide tabs (approvals, features, cleanup)
 
   // Regular ADMIN without store - should not happen, but protect anyway
   if (!store) {
@@ -393,8 +378,26 @@ export default function AdminPage() {
 
           {/* Main Content Area */}
           <div className="flex-1 px-2 sm:px-4 md:px-6 py-4 sm:py-6 overflow-y-auto">
+
+            {/* Store-required notice for SUPERADMIN without a store context */}
+            {!store && user.role === 'SUPERADMIN' && ['analytics','staff','inventory','settings','completed'].includes(activeTab) && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
+                <p className="text-2xl mb-3">🏪</p>
+                <h2 className="text-xl font-bold text-yellow-800 mb-2">Store context required</h2>
+                <p className="text-yellow-700 mb-4">
+                  This section shows data for a specific store. Go back to the home page and select a store, or use the tabs on the left to manage system-wide settings.
+                </p>
+                <button
+                  onClick={() => router.push('/')}
+                  className="px-5 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold"
+                >
+                  Select a store →
+                </button>
+              </div>
+            )}
+
             {/* Analytics Tab */}
-          {activeTab === 'analytics' && (
+          {activeTab === 'analytics' && store && (
             <div>
               {/* Date Range Selector */}
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:gap-4 items-start sm:items-end">
@@ -459,24 +462,24 @@ export default function AdminPage() {
           )}
 
           {/* Staff Management Tab */}
-          {activeTab === 'staff' && (
+          {activeTab === 'staff' && store && (
             <>
               <StaffManagement />
             </>
           )}
 
           {/* Inventory Management Tab */}
-          {activeTab === 'inventory' && <InventoryManagement />}
+          {activeTab === 'inventory' && store && <InventoryManagement />}
 
           {/* Settings Tab */}
-          {activeTab === 'settings' && (
+          {activeTab === 'settings' && store && (
             <div>
               <BrandingSettings />
             </div>
           )}
 
           {/* Completed Transactions Tab */}
-          {activeTab === 'completed' && (
+          {activeTab === 'completed' && store && (
             <div className="h-auto sm:h-[600px] md:h-[600px]">
               <CompletedTransactions isActive={activeTab === 'completed'} />
             </div>

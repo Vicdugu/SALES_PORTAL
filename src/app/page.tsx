@@ -31,6 +31,12 @@ export default function Home() {
       return;
     }
 
+    // SUPERADMIN goes straight to admin dashboard — no store selection needed
+    if (user.role === 'SUPERADMIN') {
+      router.push('/admin');
+      return;
+    }
+
     // Fetch user's stores
     fetchStores();
   }, [user, isLoading, router]);
