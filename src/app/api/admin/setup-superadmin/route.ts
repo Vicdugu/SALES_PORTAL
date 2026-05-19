@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import bcryptjs from 'bcryptjs';
+import { randomBytes } from 'crypto';
+
+function generateSecurePassword(): string {
+  // 24-char URL-safe base64 password (~143 bits of entropy)
+  return randomBytes(18).toString('base64url').slice(0, 24);
+}
 
 export async function POST(request: NextRequest) {
   // Block entirely outside of development
@@ -9,14 +15,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const { password } = body;
-
-    if (!password || typeof password !== 'string' || password.length < 16) {
-      return NextResponse.json(
-        { error: 'A password of at least 16 characters must be supplied in the request body.' },
-        { status: 400 }
-      );
+    // Accept optional password from body; fall back to auto-generated
+    let password = generateSecurePassword();
+    try {
+      const body = await request.json();
+      if (typeof body?.password === 'string' && body.password.length >= 8) {
+        password = body.password;
+      }
+    } catch {
+      // no body — keep generated password
     }
 
     // Check if superadmin already exists
@@ -31,11 +38,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const email = 'superadmin@system.local';
+
     // Create a store record for the superadmin
     const tempStore = await prisma.store.create({
       data: {
         name: 'System Administrator',
-        email: 'superadmin@system.local',
+        email,
         emailVerified: true,
       },
     });
@@ -43,7 +52,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcryptjs.hash(password, 12);
     await prisma.user.create({
       data: {
-        email: 'superadmin@system.local',
+        email,
         password: hashedPassword,
         name: 'System Administrator',
         role: 'SUPERADMIN',
@@ -53,7 +62,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Superadmin account created. Use the email and password you supplied to log in.',
+      message: 'Superadmin account created successfully.',
+      credentials: { email, password },
     });
   } catch (error: any) {
     console.error('Error creating superadmin:', error);

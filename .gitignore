@@ -54,3 +54,4 @@ build-output.log
 
 # test/utility scripts (not part of app)
 test-email-send.js
+.env*.local
