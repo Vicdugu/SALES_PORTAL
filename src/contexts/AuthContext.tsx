@@ -119,6 +119,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('store', JSON.stringify(store));
     } else if (user.storeId) {
       setStore({ id: user.storeId, name: '', email: '', currency: 'USD' });
+    } else {
+      // No store (e.g. SUPERADMIN) — clear any stale store from a previous session
+      setStore(null);
+      localStorage.removeItem('store');
     }
     // Persist UI state to localStorage for fast restore on next load.
     // Token is stored for Authorization header use; httpOnly cookie also set server-side.

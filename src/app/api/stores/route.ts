@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/client';
 import { errorResponse, successResponse } from '@/lib/utils/response';
 import { hashPassword } from '@/lib/auth/hash';
 import { getTokenFromHeader, verifyToken } from '@/lib/auth/jwt';
+import { getAuthPayload } from '@/lib/tenancy/get-auth-payload';
 import { runMigrations } from '@/lib/db/migrations';
 import { generateVerificationToken } from '@/lib/auth/verification-token';
 import { sendVerificationLinkEmail } from '@/lib/email/client';
@@ -22,18 +23,11 @@ export async function GET(request: NextRequest) {
       // Continue anyway - schema might already exist
     }
 
-    // Extract and verify JWT token
+    // Extract and verify JWT token (Authorization header or httpOnly cookie)
     const authHeader = request.headers.get('Authorization');
-    const token = getTokenFromHeader(authHeader);
-    
-    if (!token) {
-      return NextResponse.json(
-        errorResponse('UNAUTHORIZED', 'Missing authentication token'),
-        { status: 401 }
-      );
-    }
-    
-    const tokenPayload = verifyToken(token);
+    const headerToken = getTokenFromHeader(authHeader);
+    const tokenPayload = headerToken ? verifyToken(headerToken) : await getAuthPayload();
+
     if (!tokenPayload) {
       return NextResponse.json(
         errorResponse('UNAUTHORIZED', 'Invalid or expired token'),
