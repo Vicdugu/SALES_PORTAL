@@ -2,30 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { withTenantContext, withSuperadminContext } from '@/lib/db/tenant-context';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
+import { getAuthPayload } from '@/lib/tenancy/get-auth-payload';
 import { hashPassword } from '@/lib/auth/hash';
 import { errorResponse, successResponse } from '@/lib/utils/response';
-import { verifyToken } from '@/lib/auth/jwt';
 import { logSuperadminAccess } from '@/lib/auth/superadmin-audit';
-
-function getPayload(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    return verifyToken(authHeader.slice(7));
-  }
-  return null;
-}
-
-function getRole(request: NextRequest): string {
-  return getPayload(request)?.role ?? 'STAFF';
-}
 
 /**
  * GET /api/users - Get all users for a store
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get user role from JWT token
-    const userRole = getRole(request);
+    // Get user role from JWT token (header or httpOnly cookie)
+    const authPayload = await getAuthPayload();
+    const userRole = authPayload?.role ?? 'STAFF';
 
     let storeId = await getStoreId();
     
@@ -34,9 +23,8 @@ export async function GET(request: NextRequest) {
       const storeIdParam = request.nextUrl.searchParams.get('storeId');
       if (storeIdParam) {
         storeId = storeIdParam;
-        const caller = getPayload(request);
-        if (caller?.userId) {
-          void logSuperadminAccess(caller.userId, storeIdParam, 'READ_USERS', { endpoint: '/api/users' });
+        if (authPayload?.userId) {
+          void logSuperadminAccess(authPayload.userId, storeIdParam, 'READ_USERS', { endpoint: '/api/users' });
         }
       }
     }
@@ -95,17 +83,12 @@ export async function POST(request: NextRequest) {
     const { name, email, password, role, storeId: bodyStoreId } = body;
 
     // For superadmins, ALWAYS prefer bodyStoreId when provided
-    let userRole = getRole(request);
-    if (bodyStoreId) {
-      // Verify the user is a superadmin by checking JWT token
-      const authHeader = request.headers.get('authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const payload = verifyToken(authHeader.slice(7));
-        userRole = payload?.role ?? 'STAFF';
-        if (payload?.role === 'SUPERADMIN') {
-          storeId = bodyStoreId;
-          void logSuperadminAccess(payload.userId, bodyStoreId, 'CREATE_USER', { email: body.email, role: body.role });
-        }
+    const authPayload = await getAuthPayload();
+    let userRole = authPayload?.role ?? 'STAFF';
+    if (bodyStoreId && userRole === 'SUPERADMIN') {
+      storeId = bodyStoreId;
+      if (authPayload?.userId) {
+        void logSuperadminAccess(authPayload.userId, bodyStoreId, 'CREATE_USER', { email: body.email, role: body.role });
       }
     }
 
@@ -173,13 +156,9 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Determine caller role from JWT
-    let callerRole = 'STAFF';
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      const payload = verifyToken(authHeader.slice(7));
-      if (payload?.role) callerRole = payload.role;
-    }
+    // Determine caller role from JWT (header or httpOnly cookie)
+    const authPayload = await getAuthPayload();
+    const callerRole = authPayload?.role ?? 'STAFF';
 
     const storeId = await getStoreId();
 

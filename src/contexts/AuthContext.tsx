@@ -120,9 +120,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else if (user.storeId) {
       setStore({ id: user.storeId, name: '', email: '', currency: 'USD' });
     }
-    // Persist non-sensitive UI state to localStorage for fast restore on next load.
-    // The JWT itself is stored only in the httpOnly cookie (set server-side).
+    // Persist UI state to localStorage for fast restore on next load.
+    // Token is stored for Authorization header use; httpOnly cookie also set server-side.
     localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
     if (user.storeId) {
       localStorage.setItem('storeId', user.storeId);
     } else {
@@ -143,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('user');
     localStorage.removeItem('storeId');
     localStorage.removeItem('store');
+    localStorage.removeItem('token');
   };
 
   const selectStore = async (id: string, storeData?: Store) => {

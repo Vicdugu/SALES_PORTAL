@@ -2,19 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 import { withTenantContext, withSuperadminContext } from '@/lib/db/tenant-context';
 import { getStoreId } from '@/lib/tenancy/get-store-id';
+import { getAuthPayload } from '@/lib/tenancy/get-auth-payload';
 import { errorResponse, successResponse } from '@/lib/utils/response';
-import { verifyToken } from '@/lib/auth/jwt';
 import { logSuperadminAccess } from '@/lib/auth/superadmin-audit';
-
-function getPayload(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) return verifyToken(authHeader.slice(7));
-  return null;
-}
-
-function getRole(request: NextRequest): string {
-  return getPayload(request)?.role ?? 'STAFF';
-}
 
 /**
  * GET /api/transactions - Get transaction history
@@ -23,8 +13,9 @@ function getRole(request: NextRequest): string {
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get user role from JWT token
-    const userRole = getRole(request);
+    // Get user role from JWT token (header or httpOnly cookie)
+    const authPayload = await getAuthPayload();
+    const userRole = authPayload?.role ?? 'STAFF';
 
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
@@ -61,9 +52,8 @@ export async function GET(request: NextRequest) {
     // SUPERADMIN: fetch all stores' transactions
     if (userRole === 'SUPERADMIN') {
       // No storeId filter — superadmin gets all. Audit this cross-tenant access.
-      const caller = getPayload(request);
-      if (caller?.userId) {
-        void logSuperadminAccess(caller.userId, 'ALL', 'READ_ALL_TRANSACTIONS', {
+      if (authPayload?.userId) {
+        void logSuperadminAccess(authPayload.userId, 'ALL', 'READ_ALL_TRANSACTIONS', {
           filters: { startDate, endDate, filterStatus, filterPayment },
         });
       }
