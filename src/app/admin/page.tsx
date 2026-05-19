@@ -86,7 +86,7 @@ export default function AdminPage() {
   // SUPERADMIN without a store — show system-wide tabs (approvals, features, cleanup)
 
   // Regular ADMIN without store - should not happen, but protect anyway
-  if (!store) {
+  if (!store && user.role !== 'SUPERADMIN') {
     return <div className="p-8 text-red-600">No store assigned. Please contact support.</div>;
   }
 
